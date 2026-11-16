@@ -1,0 +1,1232 @@
+{
+  "openapi": "3.1.1",
+  "info": {
+    "title": "API de formación y coaching",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080",
+      "description": "Docker Compose"
+    },
+    {
+      "url": "http://127.0.0.1:8000",
+      "description": "Servidor local de Laravel"
+    }
+  ],
+  "paths": {
+    "/api/v1/health": {
+      "get": {
+        "operationId": "getHealth",
+        "summary": "Comprueba que la API responde",
+        "description": "Comprueba el proceso HTTP de Laravel sin consultar PostgreSQL.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "La API responde correctamente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "status"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "status": {
+                      "const": "ok"
+                    }
+                  }
+                },
+                "example": {
+                  "status": "ok"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error interno al procesar la petición.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                },
+                "example": {
+                  "error": "Internal Server Error",
+                  "code": 500
+                }
+              }
+            }
+          }
+        }
+      },
+      "head": {
+        "operationId": "headHealth",
+        "summary": "Consulta el estado y las cabeceras de salud",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "La API responde correctamente. La respuesta carece de cuerpo."
+          },
+          "500": {
+            "description": "Error interno. La respuesta carece de cuerpo."
+          }
+        }
+      }
+    },
+    "/api/v1/register": {
+      "post": {
+        "operationId": "registerStudent",
+        "summary": "Registra un estudiante e inicia su sesión",
+        "security": [],
+        "parameters": [
+          {
+            "name": "X-XSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "Valor URL-decodificado de XSRF-TOKEN. Laravel 13 también admite peticiones que el navegador identifica como same-origin mediante Sec-Fetch-Site.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Identidad autenticada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserEnvelope"
+                }
+              }
+            }
+          },
+          "419": {
+            "$ref": "#/components/responses/SessionExpired"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/v1/login": {
+      "post": {
+        "operationId": "login",
+        "summary": "Inicia una sesión y regenera su identificador",
+        "security": [],
+        "parameters": [
+          {
+            "name": "X-XSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "Valor URL-decodificado de XSRF-TOKEN. Laravel 13 también admite peticiones que el navegador identifica como same-origin mediante Sec-Fetch-Site.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Identidad autenticada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserEnvelope"
+                }
+              }
+            }
+          },
+          "419": {
+            "$ref": "#/components/responses/SessionExpired"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/v1/logout": {
+      "post": {
+        "operationId": "logout",
+        "summary": "Invalida la sesión actual",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-XSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "Valor URL-decodificado de XSRF-TOKEN. Laravel 13 también admite peticiones que el navegador identifica como same-origin mediante Sec-Fetch-Site.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Sesión invalidada, sin cuerpo."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "419": {
+            "$ref": "#/components/responses/SessionExpired"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/v1/user": {
+      "get": {
+        "operationId": "getCurrentUser",
+        "summary": "Consulta la identidad autenticada",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Identidad actual.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      },
+      "head": {
+        "operationId": "headCurrentUser",
+        "summary": "Consulta el estado de la identidad autenticada",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Identidad autenticada, sin cuerpo."
+          },
+          "401": {
+            "description": "Sesión ausente o expirada, sin cuerpo."
+          },
+          "500": {
+            "description": "Error interno, sin cuerpo."
+          }
+        }
+      }
+    },
+    "/sanctum/csrf-cookie": {
+      "get": {
+        "operationId": "initializeCsrf",
+        "summary": "Inicializa la sesión y la cookie CSRF",
+        "security": [],
+        "responses": {
+          "204": {
+            "description": "Cookies XSRF-TOKEN y de sesión emitidas, sin cuerpo."
+          },
+          "500": {
+            "description": "Error de inicialización gestionado por Laravel fuera del prefijo /api."
+          }
+        }
+      },
+      "head": {
+        "operationId": "headCsrf",
+        "summary": "Inicializa las cookies sin cuerpo",
+        "security": [],
+        "responses": {
+          "204": {
+            "description": "Cookies emitidas, sin cuerpo."
+          },
+          "500": {
+            "description": "Error interno, sin cuerpo."
+          }
+        }
+      }
+    },
+    "/api/v1/users": {
+      "get": {
+        "tags": [
+          "Administración"
+        ],
+        "operationId": "listUsers",
+        "summary": "Lista usuarios para Administrator",
+        "description": "Incluye especialidades, paginación, filtro por rol y ordenación permitida con id como desempate. Excluye siempre Administrator, incluso de los totales de paginación. Filtrar por Administrator devuelve una lista vacía. No devuelve contraseñas ni tokens.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "name": "filter[role]",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "Administrator",
+                "Coach",
+                "Student"
+              ]
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "id",
+                "-id",
+                "name",
+                "-name",
+                "email",
+                "-email",
+                "role",
+                "-role"
+              ],
+              "default": "id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Listado privado paginado.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string"
+                },
+                "example": "no-store, private"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUserCollection"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      },
+      "head": {
+        "tags": [
+          "Administración"
+        ],
+        "operationId": "headUsers",
+        "summary": "Consulta las cabeceras del listado sin cuerpo",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "name": "filter[role]",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "Administrator",
+                "Coach",
+                "Student"
+              ]
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "id",
+                "-id",
+                "name",
+                "-name",
+                "email",
+                "-email",
+                "role",
+                "-role"
+              ],
+              "default": "id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cabeceras sin cuerpo."
+          },
+          "401": {
+            "description": "Sesión requerida; sin cuerpo."
+          },
+          "403": {
+            "description": "Administrator requerido; sin cuerpo."
+          },
+          "422": {
+            "description": "Parámetros inválidos; sin cuerpo."
+          },
+          "500": {
+            "description": "Error interno; sin cuerpo."
+          }
+        }
+      }
+    },
+    "/api/v1/users/{user}": {
+      "patch": {
+        "tags": [
+          "Administración"
+        ],
+        "operationId": "updateUser",
+        "summary": "Edita un usuario como Administrator",
+        "description": "Edición parcial de nombre, correo, rol y especialidades. No cambia la contraseña ni inicia sesión como el usuario editado. Rechaza autoquitarse Administrator y cambios que invaliden el rol o las especialidades de Coaches con cursos. Las especialidades omitidas se conservan en Coaches; al cambiar a otro rol sin cursos se eliminan. Un correo distinto elimina su marca de verificación. Cookies y CSRF obligatorios.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "X-XSRF-TOKEN",
+            "in": "header",
+            "description": "Valor URL-decodificado de la cookie XSRF-TOKEN; Swagger lo prepara automáticamente.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUserInput"
+              },
+              "example": {
+                "name": "Coach de ejemplo",
+                "role": "Coach",
+                "specialty_ids": [
+                  1
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Usuario actualizado y especialidades actuales.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUserEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/UserNotFound"
+          },
+          "419": {
+            "$ref": "#/components/responses/SessionExpired"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/v1/specialties": {
+      "get": {
+        "tags": [
+          "Administración"
+        ],
+        "operationId": "listSpecialties",
+        "summary": "Consulta especialidades para el formulario administrativo",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "description": "Solo Administrator. Lista paginada ordenada por nombre e id, con id y nombre de cada especialidad. No incluye datos de usuarios.",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Especialidades disponibles; respuesta privada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpecialtyCollection"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      },
+      "head": {
+        "tags": [
+          "Administración"
+        ],
+        "operationId": "headSpecialties",
+        "summary": "Consulta cabeceras de especialidades sin cuerpo",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cabeceras sin cuerpo."
+          },
+          "401": {
+            "description": "Sin sesión; sin cuerpo."
+          },
+          "403": {
+            "description": "Sin permiso; sin cuerpo."
+          },
+          "422": {
+            "description": "Parámetros inválidos; sin cuerpo."
+          },
+          "500": {
+            "description": "Error interno; sin cuerpo."
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Administración"
+        ],
+        "operationId": "createSpecialty",
+        "summary": "Crea una especialidad como Administrator",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "description": "Cookies y CSRF obligatorios. Guarda únicamente la especialidad en el catálogo, sin asociarla a ningún usuario. Para asignarla, editar un usuario con rol Coach mediante PATCH users/{user}. Los estudiantes no pueden recibir especialidades. Crear una especialidad y cancelar después la edición del usuario no elimina la especialidad creada.",
+        "parameters": [
+          {
+            "name": "X-XSRF-TOKEN",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Token URL-decodificado de la cookie; Swagger lo prepara automáticamente."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StoreSpecialtyInput"
+              },
+              "example": {
+                "name": "Counter-Strike"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Especialidad creada; respuesta privada. No se ofrece una URI individual de consulta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpecialtyEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "419": {
+            "$ref": "#/components/responses/SessionExpired"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ApiError": {
+        "type": "object",
+        "required": [
+          "error",
+          "code"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "error": {
+            "type": "string"
+          },
+          "code": {
+            "type": "integer",
+            "minimum": 400,
+            "maximum": 599
+          },
+          "errors": {
+            "type": "object",
+            "description": "Mensajes por campo cuando Laravel genera un error de validación 422.",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "User": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "email",
+          "role"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "Administrator",
+              "Coach",
+              "Student"
+            ]
+          }
+        }
+      },
+      "UserEnvelope": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/User"
+          }
+        }
+      },
+      "LoginInput": {
+        "type": "object",
+        "required": [
+          "email",
+          "password"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 254
+          },
+          "password": {
+            "type": "string",
+            "maxLength": 72,
+            "description": "Maximum 72 UTF-8 bytes; null bytes are rejected. Character length alone does not express the byte limit."
+          }
+        }
+      },
+      "RegisterInput": {
+        "type": "object",
+        "required": [
+          "name",
+          "email",
+          "password",
+          "password_confirmation"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 254
+          },
+          "password": {
+            "type": "string",
+            "minLength": 12,
+            "description": "Maximum 72 UTF-8 bytes; null bytes are rejected. Character length alone does not express the byte limit.",
+            "maxLength": 72
+          },
+          "password_confirmation": {
+            "type": "string",
+            "description": "Debe coincidir con password."
+          },
+          "role": {
+            "not": {},
+            "description": "El registro público prohíbe asignar un rol. El servidor asigna Student."
+          }
+        }
+      },
+      "Specialty": {
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 100
+          }
+        }
+      },
+      "AdminUser": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "email",
+          "role",
+          "specialties"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "Administrator",
+              "Coach",
+              "Student"
+            ]
+          },
+          "specialties": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Specialty"
+            }
+          }
+        }
+      },
+      "AdminUserEnvelope": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/AdminUser"
+          }
+        }
+      },
+      "AdminUserCollection": {
+        "type": "object",
+        "required": [
+          "data",
+          "links",
+          "meta"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminUser"
+            }
+          },
+          "links": {
+            "type": "object",
+            "properties": {
+              "first": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "last": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "prev": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "next": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          },
+          "meta": {
+            "type": "object",
+            "required": [
+              "current_page",
+              "last_page",
+              "per_page",
+              "total"
+            ],
+            "properties": {
+              "current_page": {
+                "type": "integer"
+              },
+              "last_page": {
+                "type": "integer"
+              },
+              "per_page": {
+                "type": "integer"
+              },
+              "total": {
+                "type": "integer"
+              }
+            }
+          }
+        }
+      },
+      "UpdateUserInput": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 254
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "Administrator",
+              "Coach",
+              "Student"
+            ]
+          },
+          "specialty_ids": {
+            "type": "array",
+            "maxItems": 100,
+            "uniqueItems": true,
+            "items": {
+              "type": "integer"
+            },
+            "description": "Identificadores existentes. Solo Coach puede recibir especialidades. [] elimina las asociaciones salvo que algún curso las necesite."
+          },
+          "password": {
+            "not": {},
+            "description": "La contraseña no se modifica mediante este endpoint."
+          }
+        }
+      },
+      "SpecialtyCollection": {
+        "type": "object",
+        "required": [
+          "data",
+          "links",
+          "meta"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Specialty"
+            }
+          },
+          "links": {
+            "type": "object",
+            "properties": {
+              "first": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "last": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "prev": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "next": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          },
+          "meta": {
+            "type": "object",
+            "required": [
+              "current_page",
+              "last_page",
+              "per_page",
+              "total"
+            ],
+            "properties": {
+              "current_page": {
+                "type": "integer"
+              },
+              "last_page": {
+                "type": "integer"
+              },
+              "per_page": {
+                "type": "integer"
+              },
+              "total": {
+                "type": "integer"
+              }
+            }
+          }
+        }
+      },
+      "SpecialtyEnvelope": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/Specialty"
+          }
+        }
+      },
+      "StoreSpecialtyInput": {
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "Se eliminan espacios extremos. Nombre único según la restricción actual de la base (sensible a mayúsculas)."
+          }
+        }
+      }
+    },
+    "responses": {
+      "ValidationError": {
+        "description": "Validation failed",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiError"
+            },
+            "example": {
+              "error": "Validation failed",
+              "code": 422
+            }
+          }
+        }
+      },
+      "Unauthenticated": {
+        "description": "Unauthorized",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiError"
+            },
+            "example": {
+              "error": "Unauthorized",
+              "code": 401
+            }
+          }
+        }
+      },
+      "SessionExpired": {
+        "description": "Session expired",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiError"
+            },
+            "example": {
+              "error": "Session expired",
+              "code": 419
+            }
+          }
+        }
+      },
+      "RateLimited": {
+        "description": "Too Many Requests",
+        "headers": {
+          "Retry-After": {
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Segundos hasta poder reintentar."
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiError"
+            },
+            "example": {
+              "error": "Too Many Requests",
+              "code": 429
+            }
+          }
+        }
+      },
+      "ServerError": {
+        "description": "Internal Server Error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiError"
+            },
+            "example": {
+              "error": "Internal Server Error",
+              "code": 500
+            }
+          }
+        }
+      },
+      "Forbidden": {
+        "description": "Acceso reservado a Administrator.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiError"
+            },
+            "example": {
+              "error": "Forbidden",
+              "code": 403
+            }
+          }
+        }
+      },
+      "UserNotFound": {
+        "description": "Usuario no encontrado.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiError"
+            },
+            "example": {
+              "error": "Not Found",
+              "code": 404
+            }
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "sessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "dawtfg_session",
+        "description": "Cookie de sesión HttpOnly. La instancia aislada de pruebas usa dawtfg_test_session."
+      }
+    }
+  }
+}

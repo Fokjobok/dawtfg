@@ -1,0 +1,123 @@
+name: ${COMPOSE_PROJECT_NAME:-dawtfg}
+
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: infra/frontend/Dockerfile
+    environment:
+      VITE_API_BASE_URL: /api/v1
+      VITE_HOST: 0.0.0.0
+      VITE_API_PROXY_TARGET: http://nginx
+      VITE_HMR_CLIENT_PORT: ${APP_PORT:-8080}
+      VITE_USE_POLLING: ${VITE_USE_POLLING:-true}
+      OPENAPI_FILE: /home/node/openapi.json
+    volumes:
+      - ./frontend:/home/node/app
+      - ./backend/openapi.json:/home/node/openapi.json:ro
+      - frontend_pnpm_dependencies:/home/node/app/node_modules
+    networks:
+      - application
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:5173').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      start_period: 120s
+      retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: infra/backend/Dockerfile
+    environment:
+      APP_NAME: Formation and Coaching
+      APP_ENV: local
+      APP_KEY: ${APP_KEY:?Run scripts/Initialize-Development.ps1 first}
+      APP_DEBUG: "true"
+      APP_URL: http://localhost:${APP_PORT:-8080}
+      APP_LOCALE: es
+      APP_FALLBACK_LOCALE: en
+      LOG_CHANNEL: stderr
+      LOG_LEVEL: debug
+      DB_CONNECTION: pgsql
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_DATABASE: ${DB_DATABASE:-dawtfg}
+      DB_USERNAME: ${DB_USERNAME:-dawtfg}
+      DB_PASSWORD: ${DB_PASSWORD:?Run scripts/Initialize-Development.ps1 first}
+      SESSION_DRIVER: file
+      SESSION_COOKIE: ${COMPOSE_PROJECT_NAME:-dawtfg}_session
+      CACHE_STORE: file
+      QUEUE_CONNECTION: sync
+      MAIL_MAILER: log
+    volumes:
+      - ./backend:/var/www/html
+      - backend_dependencies:/var/www/html/vendor
+      - backend_storage:/var/www/html/storage
+      - backend_cache:/var/www/html/bootstrap/cache
+    networks:
+      - application
+      - database
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD-SHELL, "SCRIPT_NAME=/fpm-ping SCRIPT_FILENAME=/fpm-ping REQUEST_METHOD=GET cgi-fcgi -bind -connect 127.0.0.1:9000 | grep -q pong"]
+      interval: 10s
+      timeout: 5s
+      start_period: 120s
+      retries: 5
+
+  nginx:
+    build:
+      context: .
+      dockerfile: infra/nginx/Dockerfile
+    ports:
+      - "127.0.0.1:${APP_PORT:-8080}:80"
+    volumes:
+      - ./infra/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./backend/public:/var/www/html/public:ro
+    networks:
+      - application
+    depends_on:
+      frontend:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD-SHELL, "wget -q -O /dev/null http://127.0.0.1/api/v1/health"]
+      interval: 10s
+      timeout: 5s
+      start_period: 10s
+      retries: 5
+
+  postgres:
+    build:
+      context: .
+      dockerfile: infra/postgres/Dockerfile
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:-dawtfg}
+      POSTGRES_USER: ${DB_USERNAME:-dawtfg}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Run scripts/Initialize-Development.ps1 first}
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    networks:
+      - database
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 5s
+      start_period: 15s
+      retries: 10
+
+networks:
+  application:
+  database:
+    internal: true
+
+volumes:
+  frontend_pnpm_dependencies:
+  backend_dependencies:
+  backend_storage:
+  backend_cache:
+  postgres_data:

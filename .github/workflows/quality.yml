@@ -1,0 +1,72 @@
+name: Quality
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  frontend:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24.22.2
+          package-manager-cache: false
+      - run: corepack pnpm install --frozen-lockfile
+      - run: corepack pnpm audit --audit-level=low
+      - run: corepack pnpm run format:check
+      - run: corepack pnpm run lint
+      - run: node ../scripts/Check-Contrast.mjs
+      - run: corepack pnpm test
+      - run: corepack pnpm run build
+
+  backend:
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:18.6-trixie
+        env:
+          POSTGRES_DB: dawtfg_test
+          POSTGRES_USER: dawtfg_test
+          POSTGRES_PASSWORD: testing-only
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U dawtfg_test -d dawtfg_test"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
+        with:
+          php-version: '8.5'
+          extensions: dom, mbstring, pdo_pgsql, pdo_sqlite, xml, xmlwriter
+          tools: composer:2.11.2
+          coverage: none
+      - run: composer validate --strict
+      - run: composer install --no-interaction --prefer-dist
+      - run: composer check-platform-reqs
+      - run: composer audit --locked
+      - run: composer run format:check
+      - run: composer test
+      - run: composer test
+        name: Test PostgreSQL integration
+        env:
+          TEST_DB_CONNECTION: pgsql
+          TEST_DB_HOST: 127.0.0.1
+          TEST_DB_DATABASE: dawtfg_test
+          TEST_DB_USERNAME: dawtfg_test
+          TEST_DB_PASSWORD: testing-only

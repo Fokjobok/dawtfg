@@ -1,0 +1,86 @@
+@use '../styles/mixins';
+
+.grid {
+  display: grid;
+  align-items: start;
+  gap: var(--space-8);
+
+  @include mixins.desktop {
+    grid-template-columns: minmax(0, 1fr) minmax(0, var(--form-width));
+    gap: var(--space-16);
+  }
+}
+
+.intro {
+  display: grid;
+  gap: var(--space-6);
+
+  > p:not(.eyebrow) {
+    max-width: 42ch;
+    color: var(--color-muted);
+  }
+}
+
+.eyebrow {
+  color: var(--color-accent);
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+
+.note {
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--color-divider);
+  font-size: 0.875rem;
+}
+
+.panel {
+  display: grid;
+  gap: var(--space-6);
+  min-width: 0;
+  padding: var(--space-6);
+  background: var(--color-surface);
+  border: 1px solid var(--color-divider);
+  border-top: 3px solid var(--color-accent);
+  border-radius: var(--radius-panel);
+
+  @include mixins.desktop {
+    padding: var(--space-8);
+  }
+}
+
+.form {
+  display: grid;
+  gap: var(--space-6);
+}
+
+.notice {
+  border-left: 3px solid var(--color-link);
+  padding-left: var(--space-4);
+}
+
+.identity {
+  display: grid;
+  gap: var(--space-6);
+  margin: 0;
+
+  dt {
+    color: var(--color-muted);
+    font-size: 0.875rem;
+  }
+
+  dd {
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+
+  > button {
+    flex: 1 1 auto;
+  }
+}

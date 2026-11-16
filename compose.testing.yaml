@@ -1,0 +1,96 @@
+name: dawtfg-auth-tests
+
+services:
+  test-postgres:
+    image: dawtfg-postgres
+    environment:
+      POSTGRES_DB: dawtfg_test
+      POSTGRES_USER: dawtfg_test
+      POSTGRES_PASSWORD: testing-only
+    tmpfs:
+      - /var/lib/postgresql
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U dawtfg_test -d dawtfg_test"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    networks: [testing]
+
+  test-backend:
+    image: dawtfg-backend
+    environment:
+      APP_ENV: local
+      APP_NAME: Authentication verification
+      APP_DEBUG: 'false'
+      APP_URL: http://127.0.0.1:8081
+      # Public fixture key and credentials, used only in this isolated test project.
+      APP_KEY: base64:MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
+      DB_CONNECTION: pgsql
+      DB_HOST: test-postgres
+      DB_PORT: 5432
+      DB_DATABASE: dawtfg_test
+      DB_USERNAME: dawtfg_test
+      DB_PASSWORD: testing-only
+      SESSION_DRIVER: file
+      SESSION_COOKIE: dawtfg_test_session
+      CACHE_STORE: file
+      QUEUE_CONNECTION: sync
+      LOG_CHANNEL: stderr
+      MAIL_MAILER: array
+      TEST_DB_CONNECTION: pgsql
+      TEST_DB_HOST: test-postgres
+      TEST_DB_DATABASE: dawtfg_test
+      TEST_DB_USERNAME: dawtfg_test
+      TEST_DB_PASSWORD: testing-only
+    volumes:
+      - ./backend:/var/www/html:ro
+      - /var/www/html/vendor
+    tmpfs:
+      - /var/www/html/storage
+      - /var/www/html/bootstrap/cache
+    depends_on:
+      test-postgres:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD-SHELL, "SCRIPT_NAME=/fpm-ping SCRIPT_FILENAME=/fpm-ping REQUEST_METHOD=GET cgi-fcgi -bind -connect 127.0.0.1:9000 | grep -q pong"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks:
+      testing:
+        aliases: [backend]
+
+  test-frontend:
+    image: dawtfg-frontend
+    environment:
+      VITE_API_BASE_URL: /api/v1
+      VITE_HOST: 0.0.0.0
+      VITE_API_PROXY_TARGET: http://test-nginx
+      VITE_HMR_CLIENT_PORT: 8081
+    volumes:
+      - ./frontend:/home/node/app:ro
+      - /home/node/app/node_modules
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:5173').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks:
+      testing:
+        aliases: [frontend]
+
+  test-nginx:
+    image: dawtfg-nginx
+    ports: ['127.0.0.1:8081:80']
+    volumes:
+      - ./infra/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./backend/public:/var/www/html/public:ro
+    depends_on:
+      test-backend:
+        condition: service_healthy
+      test-frontend:
+        condition: service_healthy
+    networks: [testing]
+
+networks:
+  testing:

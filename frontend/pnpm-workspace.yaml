@@ -1,0 +1,53 @@
+minimumReleaseAge: 10080
+# Keep the exact, previously audited versions until they reach seven days.
+# Recheck without these exceptions after 2026-11-16 12:00 Europe/Madrid.
+minimumReleaseAgeExclude:
+  - '@babel/core@7.29.13'
+  - '@babel/generator@7.29.13'
+  - '@babel/helper-compilation-targets@7.29.13'
+  - '@babel/helper-module-transforms@7.29.13'
+  - '@babel/helper-string-parser@7.29.13'
+  - '@babel/helpers@7.29.13'
+  - '@babel/parser@7.29.13'
+  - '@babel/runtime@7.29.13'
+  - '@babel/traverse@7.29.13'
+  - '@eslint-community/regexpp@4.12.3'
+  - '@isaacs/nonrecursive-glob-match@1.1.0'
+  - '@rolldown/binding-android-arm-eabi@1.2.18'
+  - '@rolldown/binding-android-arm64@1.2.18'
+  - '@rolldown/binding-darwin-arm64@1.2.18'
+  - '@rolldown/binding-darwin-x64@1.2.18'
+  - '@rolldown/binding-freebsd-x64@1.2.18'
+  - '@rolldown/binding-linux-arm-gnueabihf@1.2.18'
+  - '@rolldown/binding-linux-arm64-gnu@1.2.18'
+  - '@rolldown/binding-linux-arm64-musl@1.2.18'
+  - '@rolldown/binding-linux-ppc64-gnu@1.2.18'
+  - '@rolldown/binding-linux-s390x-gnu@1.2.18'
+  - '@rolldown/binding-linux-x64-gnu@1.2.18'
+  - '@rolldown/binding-linux-x64-musl@1.2.18'
+  - '@rolldown/binding-openharmony-arm64@1.2.18'
+  - '@rolldown/binding-win32-arm64-msvc@1.2.18'
+  - '@rolldown/binding-win32-x64-msvc@1.2.18'
+  - '@rolldown/pluginutils@1.1.0'
+  - '@vitejs/plugin-react@6.3.0'
+  - 'caniuse-lite@1.0.30001823'
+  - 'electron-to-chromium@1.5.478'
+  - 'jsdom@31.0.0'
+  - 'parse5-parser-stream@8.1.1'
+  - 'parse5@8.1.1'
+  - 'rolldown@1.2.18'
+  - 'tough-cookie@6.1.0'
+  - 'undici@8.12.4'
+  - 'vite@8.3.7'
+trustPolicy: no-downgrade
+blockExoticSubdeps: true
+strictDepBuilds: true
+allowBuilds:
+  # Swagger's optional installation telemetry is not needed.
+  '@scarf/scarf@1.4.0': false
+  # Sass uses the registry's prebuilt watcher; never compile it during install.
+  '@parcel/watcher@2.6.0': false
+overrides:
+  # GHSA-g3hv-75wg-m249. Remove when both consumers accept the patched major.
+  eslint@10.14.0>minimatch: 11.0.1
+  '@eslint/config-array@0.23.5>minimatch': 11.0.1

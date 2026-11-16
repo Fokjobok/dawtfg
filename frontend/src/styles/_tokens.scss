@@ -1,0 +1,32 @@
+$colors: (
+  background: #0b1220,
+  surface: #111d2e,
+  surface-raised: #18283c,
+  text: #edf3fc,
+  muted: #b4c4d8,
+  border: #73879f,
+  divider: #293c54,
+  primary: #205393,
+  primary-hover: #194478,
+  link: #9bc4ff,
+  accent: #8fd0ad,
+  danger: #ffb4b4,
+  focus: #c6dbff,
+);
+
+:root {
+  @each $name, $value in $colors {
+    --color-#{$name}: #{$value};
+  }
+
+  @each $step in (1, 2, 3, 4, 6, 8, 12, 16) {
+    --space-#{$step}: #{$step * 0.25rem};
+  }
+
+  --font-body:
+    system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --radius-control: 0.5rem;
+  --radius-panel: 1rem;
+  --container-width: 72rem;
+  --form-width: 30rem;
+}

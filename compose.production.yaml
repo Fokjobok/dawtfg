@@ -1,0 +1,134 @@
+name: dawtfg-production
+
+x-logging: &logging
+  driver: local
+  options:
+    max-size: 10m
+    max-file: '3'
+
+services:
+  prod-backend:
+    image: dawtfg-production-backend:${PRODUCTION_RELEASE:-local}
+    build:
+      context: .
+      dockerfile: infra/backend/Dockerfile
+      target: production
+    environment:
+      APP_NAME: Formation and Coaching
+      APP_ENV: production
+      APP_DEBUG: 'false'
+      APP_KEY: ${PRODUCTION_APP_KEY:?Generate a separate production environment file}
+      APP_URL: ${PRODUCTION_APP_URL:?Set the canonical HTTPS URL}
+      APP_LOCALE: es
+      APP_FALLBACK_LOCALE: en
+      LOG_CHANNEL: stderr
+      LOG_LEVEL: warning
+      DB_CONNECTION: pgsql
+      DB_HOST: prod-postgres
+      DB_PORT: 5432
+      DB_DATABASE: ${PRODUCTION_DB_DATABASE:-dawtfg_production}
+      DB_USERNAME: ${PRODUCTION_DB_USERNAME:-dawtfg_production}
+      DB_PASSWORD: ${PRODUCTION_DB_PASSWORD:?Set a separate production database password}
+      SESSION_DRIVER: file
+      SESSION_COOKIE: dawtfg_production_session
+      SESSION_SECURE_COOKIE: 'true'
+      SESSION_HTTP_ONLY: 'true'
+      SESSION_ENCRYPT: 'true'
+      SESSION_SAME_SITE: lax
+      SANCTUM_STATEFUL_DOMAINS: ${PRODUCTION_APP_HOST:?Set the canonical host}${PRODUCTION_STATEFUL_PORT_SUFFIX:-}
+      CACHE_STORE: file
+      QUEUE_CONNECTION: sync
+      MAIL_MAILER: log
+    volumes:
+      - production_storage:/var/www/html/storage
+    read_only: true
+    tmpfs:
+      - /tmp:uid=33,gid=33,mode=1777
+      - /var/www/html/bootstrap/cache:uid=33,gid=33,mode=0755
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    networks: [production_web, production_database]
+    depends_on:
+      prod-postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    logging: *logging
+    healthcheck:
+      test: [CMD-SHELL, "SCRIPT_NAME=/fpm-ping SCRIPT_FILENAME=/fpm-ping REQUEST_METHOD=GET cgi-fcgi -bind -connect 127.0.0.1:9000 | grep -q pong"]
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 5
+
+  prod-nginx:
+    image: dawtfg-production-nginx:${PRODUCTION_RELEASE:-local}
+    build:
+      context: .
+      dockerfile: infra/production/nginx.Dockerfile
+    environment:
+      APP_HOST: ${PRODUCTION_APP_HOST:?Set the canonical host}
+      APP_URL: ${PRODUCTION_APP_URL:?Set the canonical HTTPS URL}
+      NGINX_ENVSUBST_FILTER: ^(APP_HOST|APP_URL)$
+    ports:
+      - '${PRODUCTION_BIND_ADDRESS:-127.0.0.1}:${PRODUCTION_HTTP_PORT:-8088}:8080'
+      - '${PRODUCTION_BIND_ADDRESS:-127.0.0.1}:${PRODUCTION_HTTPS_PORT:-8443}:8443'
+    volumes:
+      - type: bind
+        source: ${PRODUCTION_TLS_DIR:?Set the certificate directory}
+        target: /etc/nginx/tls
+        read_only: true
+        bind:
+          create_host_path: false
+    read_only: true
+    tmpfs:
+      - /tmp:uid=101,gid=101,mode=1777
+      - /etc/nginx/conf.d:uid=101,gid=101,mode=0755
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    networks: [production_web]
+    depends_on:
+      prod-backend:
+        condition: service_healthy
+    restart: unless-stopped
+    logging: *logging
+    healthcheck:
+      test: [CMD-SHELL, 'wget -q -O /dev/null --header="Host: $$APP_HOST" http://127.0.0.1:8080/healthz']
+      interval: 10s
+      timeout: 5s
+      start_period: 15s
+      retries: 5
+
+  prod-postgres:
+    image: dawtfg-production-postgres:${PRODUCTION_RELEASE:-local}
+    build:
+      context: .
+      dockerfile: infra/postgres/Dockerfile
+      target: production
+    environment:
+      POSTGRES_DB: ${PRODUCTION_DB_DATABASE:-dawtfg_production}
+      POSTGRES_USER: dawtfg_owner
+      POSTGRES_PASSWORD: ${PRODUCTION_DB_ADMIN_PASSWORD:?Set a separate database administration password}
+      APP_DB_USER: ${PRODUCTION_DB_USERNAME:-dawtfg_production}
+      APP_DB_PASSWORD: ${PRODUCTION_DB_PASSWORD:?Set the production application database password}
+    volumes:
+      - production_postgres:/var/lib/postgresql
+    networks: [production_database]
+    restart: unless-stopped
+    logging: *logging
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
+      interval: 5s
+      timeout: 5s
+      start_period: 15s
+      retries: 10
+
+networks:
+  production_web:
+  production_database:
+    internal: true
+
+volumes:
+  production_postgres:
+    name: ${PRODUCTION_DB_VOLUME:?Set a dedicated production data volume}
+  production_storage:
+    name: ${PRODUCTION_STORAGE_VOLUME:?Set a dedicated production storage volume}

@@ -1,0 +1,226 @@
+/* Match the application's documented dark palette without changing vendor files. */
+:root {
+  color-scheme: dark;
+  --docs-background: #0b1220;
+  --docs-surface: #111d2e;
+  --docs-raised: #18283c;
+  --docs-text: #edf3fc;
+  --docs-muted: #b4c4d8;
+  --docs-border: #73879f;
+  --docs-link: #9bc4ff;
+}
+
+body {
+  margin: 0;
+  background: var(--docs-background);
+  color: var(--docs-text);
+}
+
+.swagger-ui {
+  color: var(--docs-text);
+}
+
+.swagger-ui :is(h1, h2, h3, h4, h5, p, label, th, td, small),
+.swagger-ui .info .title,
+.swagger-ui .opblock-tag,
+.swagger-ui .opblock .opblock-summary-path,
+.swagger-ui .opblock .opblock-summary-description,
+.swagger-ui .opblock-description-wrapper,
+.swagger-ui .opblock .opblock-section-header h4,
+.swagger-ui .parameter__name,
+.swagger-ui .parameter__type,
+.swagger-ui .parameter__in,
+.swagger-ui .response-col_status,
+.swagger-ui .response-col_links,
+.swagger-ui .model,
+.swagger-ui .model-title,
+.swagger-ui .prop-format,
+.swagger-ui .tab li,
+.swagger-ui .btn {
+  color: var(--docs-text);
+}
+
+.swagger-ui a,
+.swagger-ui .info a,
+.swagger-ui .prop-type {
+  color: var(--docs-link);
+}
+
+.swagger-ui .scheme-container,
+.swagger-ui .opblock .opblock-section-header,
+.swagger-ui section.models,
+.swagger-ui section.models .model-container,
+.swagger-ui .model-box,
+.swagger-ui .dialog-ux .modal-ux,
+.swagger-ui .dialog-ux .modal-ux-header {
+  background: var(--docs-surface);
+  border-color: var(--docs-border);
+  box-shadow: none;
+}
+
+.swagger-ui .opblock {
+  background: var(--docs-surface);
+  box-shadow: none;
+}
+
+.swagger-ui .opblock-summary,
+.swagger-ui .opblock-tag,
+.swagger-ui table thead tr th,
+.swagger-ui table thead tr td {
+  color: var(--docs-text);
+  border-color: var(--docs-border);
+}
+
+.swagger-ui :is(input, textarea, select),
+.swagger-ui input[type='text'],
+.swagger-ui input[type='password'],
+.swagger-ui input[type='email'] {
+  color: var(--docs-text);
+  background: var(--docs-raised);
+  border-color: var(--docs-border);
+}
+
+.swagger-ui :is(input, textarea)::placeholder {
+  color: var(--docs-muted);
+}
+
+.swagger-ui :is(pre, .microlight, .highlight-code),
+.swagger-ui .body-param__text {
+  color: var(--docs-text);
+  background: var(--docs-background);
+}
+
+.swagger-ui .renderedMarkdown code {
+  color: var(--docs-text);
+  background: var(--docs-raised);
+}
+
+.swagger-ui .opblock-summary-method {
+  color: #fff;
+}
+
+.swagger-ui .opblock.opblock-get .opblock-summary-method,
+.swagger-ui .btn.execute {
+  background: #205393;
+}
+
+.swagger-ui .opblock.opblock-post .opblock-summary-method {
+  background: #296047;
+}
+
+.swagger-ui .opblock.opblock-head .opblock-summary-method {
+  background: #6749a3;
+}
+
+.swagger-ui .btn.authorize {
+  color: #8fd0ad;
+  border-color: #8fd0ad;
+}
+
+.swagger-ui svg {
+  fill: currentColor;
+}
+
+.swagger-ui .opblock-control-arrow,
+.swagger-ui .expand-operation,
+.swagger-ui .models-control {
+  color: var(--docs-text);
+}
+
+.swagger-ui :focus-visible {
+  outline: 2px solid #c6dbff;
+  outline-offset: 1px;
+}
+
+/* OpenAPI 3.1 uses a separate JSON Schema renderer from the legacy models. */
+.swagger-ui .json-schema-2020-12 {
+  background: var(--docs-raised);
+  color: var(--docs-text);
+}
+
+.swagger-ui .json-schema-2020-12 .json-schema-2020-12 {
+  background: transparent;
+}
+
+.swagger-ui .json-schema-2020-12 .json-schema-2020-12__title,
+.swagger-ui .json-schema-2020-12 [class*='json-schema-2020-12-keyword__name'],
+.swagger-ui .json-schema-2020-12 [class*='json-schema-2020-12-keyword__value'],
+.swagger-ui
+  .json-schema-2020-12
+  [class*='json-schema-2020-12-json-viewer__name'],
+.swagger-ui
+  .json-schema-2020-12
+  [class*='json-schema-2020-12-json-viewer__value'] {
+  color: var(--docs-text);
+}
+
+.swagger-ui .json-schema-2020-12 .json-schema-2020-12__attribute {
+  color: var(--docs-link);
+}
+
+.swagger-ui .json-schema-2020-12 .json-schema-2020-12__attribute--muted,
+.swagger-ui .json-schema-2020-12-keyword--description,
+.swagger-ui .json-schema-2020-12-expand-deep-button {
+  color: var(--docs-muted);
+}
+
+.swagger-ui .json-schema-2020-12-accordion,
+.swagger-ui .json-schema-2020-12-expand-deep-button {
+  background: transparent;
+  color: var(--docs-text);
+  cursor: pointer;
+}
+
+.swagger-ui .json-schema-2020-12-expand-deep-button:hover {
+  color: var(--docs-link);
+  text-decoration: underline;
+}
+
+.swagger-ui .json-schema-2020-12 .json-schema-2020-12__constraint {
+  background: #205393;
+  color: #fff;
+}
+
+.swagger-ui .json-schema-2020-12 .json-schema-2020-12__attribute--warning,
+.swagger-ui .json-schema-2020-12 [class$='__value--warning'],
+.swagger-ui
+  .json-schema-2020-12-property--required
+  > .json-schema-2020-12:first-of-type
+  > .json-schema-2020-12-head
+  .json-schema-2020-12__title::after {
+  color: #ffb4b4;
+}
+
+.swagger-ui .json-schema-2020-12-body,
+.swagger-ui .json-schema-2020-12-keyword__children,
+.swagger-ui .json-schema-2020-12-json-viewer__children {
+  border-color: var(--docs-border);
+}
+
+/* Vendor rules on endpoint descriptions and nested tables outrank base text. */
+.swagger-ui .opblock-description-wrapper p,
+.swagger-ui .opblock-external-docs-wrapper p,
+.swagger-ui .opblock-title_normal p,
+.swagger-ui .opblock .renderedMarkdown p,
+.swagger-ui .responses-inner h4,
+.swagger-ui .responses-inner h5,
+.swagger-ui .responses-inner .header-col,
+.swagger-ui .response-col_description .headers__title,
+.swagger-ui .response-col_description .header-col {
+  color: var(--docs-text);
+}
+
+.swagger-ui .response-control-media-type__accept-message,
+.swagger-ui .response-control-media-type__accept-message code {
+  color: #8fd0ad;
+}
+
+.swagger-ui .parameter__name.required::after,
+.swagger-ui .parameter__name.required span {
+  color: #ffb4b4;
+}
+
+/* The pinned highlighter emits this numeric token as an inline color. */
+.swagger-ui .highlight-code span[style*='color: rgb(211, 99, 99)'] {
+  color: #ffb4b4 !important;
+}

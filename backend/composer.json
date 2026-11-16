@@ -1,0 +1,64 @@
+{
+    "$schema": "https://getcomposer.org/schema.json",
+    "name": "fokjobok/gagj-dawtfg26-api",
+    "type": "project",
+    "description": "Independent REST API for the DAW formation and coaching project.",
+    "keywords": [
+        "laravel",
+        "framework"
+    ],
+    "license": "MIT",
+    "require": {
+        "php": "^8.3",
+        "ext-pdo_pgsql": "*",
+        "laravel/framework": "^13.17",
+        "laravel/sanctum": "^4.4.0"
+    },
+    "require-dev": {
+        "laravel/pint": "^1.32.2",
+        "mockery/mockery": "^1.6.15",
+        "phpunit/phpunit": "^12.5.43"
+    },
+    "autoload": {
+        "psr-4": {
+            "App\\": "app/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "setup": [
+            "@php -r \"file_exists('.env') || copy('.env.example', '.env');\"",
+            "@php artisan key:generate"
+        ],
+        "dev": [
+            "Composer\\Config::disableProcessTimeout",
+            "@php artisan serve --host=127.0.0.1 --port=8000"
+        ],
+        "format": "pint",
+        "format:check": "pint --test",
+        "test": "phpunit",
+        "post-autoload-dump": [
+            "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
+            "@php artisan package:discover --ansi"
+        ],
+        "pre-package-uninstall": [
+            "Illuminate\\Foundation\\ComposerScripts::prePackageUninstall"
+        ]
+    },
+    "extra": {
+        "laravel": {
+            "dont-discover": []
+        }
+    },
+    "config": {
+        "optimize-autoloader": true,
+        "preferred-install": "dist",
+        "sort-packages": true
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}
