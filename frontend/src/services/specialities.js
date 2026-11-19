@@ -6,9 +6,7 @@ export function getSpecialties(page = 1) {
 }
 
 export function getSpecialtyCoaches(specialtyId, page = 1) {
-  return apiRequest(
-    `/specialties/${specialtyId}/coaches?page=${page}`,
-  )
+  return apiRequest(`/specialties/${specialtyId}/coaches?page=${page}`)
 }
 
 export async function createSpecialty(name) {

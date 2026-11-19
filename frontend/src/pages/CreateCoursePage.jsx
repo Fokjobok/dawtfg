@@ -346,7 +346,6 @@ export default function CreateCoursePage() {
             </fieldset>
           )}
 
-
           <FormField
             as="select"
             id="course-status"
@@ -361,7 +360,6 @@ export default function CreateCoursePage() {
             <option value="published">Publicado</option>
           </FormField>
 
-
           <FormField
             as="select"
             id="pricing-type"
@@ -373,7 +371,6 @@ export default function CreateCoursePage() {
             <option value="free">Gratuito</option>
             <option value="paid">De pago</option>
           </FormField>
-
 
           {form.pricingType === 'paid' && (
             <FormField

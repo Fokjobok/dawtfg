@@ -29,9 +29,7 @@ export default function CourseCard({ course }) {
       <div className={styles.content}>
         <p>{course.specialty.name}</p>
 
-        <h2 id={`course-${course.id}-title`}>
-          {course.title}
-        </h2>
+        <h2 id={`course-${course.id}-title`}>{course.title}</h2>
 
         <p className={styles.description}>{course.description}</p>
         <p>Coach: {course.coach.name}</p>

@@ -14,12 +14,7 @@ import RequireRole from './components/RequireRole.jsx'
 export default function App() {
   return (
     <Routes>
-
-
       <Route element={<AppLayout />}>
-
-
-
         <Route index element={<HomePage />} />
 
         <Route path="account" element={<AccountPage />} />
@@ -35,12 +30,7 @@ export default function App() {
         <Route element={<RequireRole role={['Coach', 'Administrator']} />}>
           <Route path="courses/create" element={<CreateCoursePage />} />
         </Route>
-
-
-
       </Route>
-
-
     </Routes>
   )
 }

@@ -45,9 +45,7 @@ export default function CoursesPage() {
         Descubre nuestros cursos y encuentra lo que quieres aprender.
       </p>
 
-      {status === 'loading' && (
-        <p role="status">Cargando cursos…</p>
-      )}
+      {status === 'loading' && <p role="status">Cargando cursos…</p>}
 
       {status === 'error' && (
         <p role="alert">
@@ -72,10 +70,7 @@ export default function CoursesPage() {
               className={styles.pagination}
               aria-label="Paginación de cursos"
             >
-              <Button
-                disabled={page <= 1}
-                onClick={() => changePage(page - 1)}
-              >
+              <Button disabled={page <= 1} onClick={() => changePage(page - 1)}>
                 Anterior
               </Button>
 

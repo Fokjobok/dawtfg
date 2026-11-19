@@ -6,8 +6,7 @@ import FormField from './FormField.jsx'
 import { ROLE_LABELS } from '../roles.js'
 import { updateUser } from '../services/users.js'
 
-import { getSpecialties, createSpecialty, } from '../services/specialities.js'
-
+import { getSpecialties, createSpecialty } from '../services/specialities.js'
 
 export default function EditUserForm({ account, onSaved, onCancel }) {
   const [form, setForm] = useState({
@@ -29,7 +28,6 @@ export default function EditUserForm({ account, onSaved, onCancel }) {
   const [creatingSpecialty, setCreatingSpecialty] = useState(false)
 
   const [specialtyError, setSpecialtyError] = useState('')
-
 
   useEffect(() => {
     let active = true
@@ -58,13 +56,12 @@ export default function EditUserForm({ account, onSaved, onCancel }) {
         }
       }
     }
-        loadSpecialties()
+    loadSpecialties()
 
     return () => {
       active = false
     }
   }, [])
-
 
   function handleChange(event) {
     const { name, value } = event.target
@@ -101,9 +98,8 @@ export default function EditUserForm({ account, onSaved, onCancel }) {
 
   //Convierte las opciones seleccionadas en lista de id
   function handleSpecialtiesChange(event) {
-    const ids = Array.from(
-      event.target.selectedOptions,
-      (option) => Number(option.value),
+    const ids = Array.from(event.target.selectedOptions, (option) =>
+      Number(option.value),
     )
 
     setForm((current) => ({
@@ -127,8 +123,7 @@ export default function EditUserForm({ account, onSaved, onCancel }) {
       setShowSpecialtyForm(false)
     } catch (error) {
       setSpecialtyError(
-        error.errors?.name?.join(' ') ||
-          'No se pudo crear la especialidad.',
+        error.errors?.name?.join(' ') || 'No se pudo crear la especialidad.',
       )
     } finally {
       setCreatingSpecialty(false)
@@ -181,7 +176,7 @@ export default function EditUserForm({ account, onSaved, onCancel }) {
 
           {message && <p role="alert">{message}</p>}
 
-                    {form.role === 'Coach' && (
+          {form.role === 'Coach' && (
             <fieldset>
               <legend>Especialidades del Coach</legend>
 
@@ -200,9 +195,7 @@ export default function EditUserForm({ account, onSaved, onCancel }) {
               )}
 
               {specialtiesStatus === 'error' && (
-                <p role="alert">
-                  No se pudieron cargar las especialidades.
-                </p>
+                <p role="alert">No se pudieron cargar las especialidades.</p>
               )}
 
               <FormField
@@ -241,9 +234,7 @@ export default function EditUserForm({ account, onSaved, onCancel }) {
                     id="new-specialty-name"
                     label="Nombre de la especialidad"
                     value={specialtyName}
-                    onChange={(event) =>
-                      setSpecialtyName(event.target.value)
-                    }
+                    onChange={(event) => setSpecialtyName(event.target.value)}
                     onKeyDown={(event) => {
                       if (event.key === 'Enter') {
                         event.preventDefault()
