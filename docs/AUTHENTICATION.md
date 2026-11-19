@@ -15,6 +15,10 @@ El login y el registro regeneran el identificador de sesión. Laravel 13 acepta 
 
 ## Sesión y respuestas
 
+GET/HEAD `/api/v1/session` permite consultar opcionalmente la sesión al entrar en la SPA: devuelve 200 con `{"data":null}` para un visitante o `data` con la identidad propia cuando existe sesión web válida. Solo expone id, nombre, correo y rol del usuario de la cookie; no permite elegir otra cuenta ni autenticar mediante Bearer. Usa el grupo web para resolver la sesión incluso sin Origin y siempre envía `Cache-Control: no-store, private`. HEAD no tiene cuerpo. Esto permite consultar si se ha iniciado sesión sin provocar un 401 esperado en la consola del navegador.
+
+GET `/api/v1/user` sigue siendo una consulta protegida y devuelve 401 sin sesión. Las demás rutas privadas conservan 401/403 y sus Policies. En React, `getSession()` consulta `/session`; `RequireRole` comprueba sesión y rol antes de montar administración o creación de cursos. Administración requiere Administrator y la creación admite Coach o Administrator. El catálogo de cursos es público. Estas comprobaciones de interfaz no sustituyen la autorización del backend.
+
 La cookie del proyecto principal de desarrollo se llama `dawtfg_session`, es HttpOnly, host-only y SameSite=Lax. Compose deriva su nombre del proyecto para separar instancias paralelas sobre localhost; las cookies no se aíslan por puerto. La duración predeterminada es de 120 minutos y el almacenamiento de archivos de sesión se cifra. `Secure` se activa por defecto con `APP_ENV=production`; la configuración de producción usa `dawtfg_production_session`. Las representaciones de identidad tienen `Cache-Control: no-store, private`.
 
 | Respuesta | Comportamiento |

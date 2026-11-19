@@ -1,12 +1,14 @@
 # Datos iniciales de cursos y especialidades
 
-El modelo organiza los cursos por especialidad y relaciona cada Coach con las materias que puede impartir. El esquema se reproduce mediante migraciones. La creación de cursos mediante API sigue pendiente.
+El modelo organiza los cursos por especialidad y relaciona cada Coach con las materias que puede impartir. El esquema se reproduce mediante migraciones. La API permite crear cursos como borrador o publicado y consultar un catálogo público; React ofrece el formulario de creación y el catálogo de tarjetas en `/courses`.
 
 ## Tablas y decisiones
 
 `specialties`: `id`, `name` (texto de hasta 100 caracteres, único), `created_at` y `updated_at`. Una especialidad puede agrupar varios cursos; cada curso tiene como máximo una especialidad. Se renombra la tabla anterior `categories` conservando filas e identificadores. No hay una categoría general adicional.
 
 `coach_specialty`: `coach_id` a `users.id` y `specialty_id` a `specialties.id`, con clave primaria compuesta para impedir asociaciones repetidas e índice por especialidad para buscar sus Coaches. Un Coach puede tener varias especialidades y cada especialidad varios Coaches. Al eliminar un usuario o especialidad sin cursos que lo impidan se eliminan sus asociaciones, sin borrar el otro extremo. No se añadieron datos de ejemplo ni se asignaron especialidades a las cuentas existentes.
+
+`course_coach`: relación N:M de los Coaches adicionales de un curso. Contiene `course_id` a `courses.id` y `coach_id` a `users.id`, con clave primaria compuesta e índice por Coach. El responsable permanece únicamente en `courses.coach_id`; la API rechaza incluirlo también como adicional. Cada colaborador debe tener rol Coach y estar asignado a la especialidad del curso. Si se elimina un curso, se eliminan sus asociaciones; eliminar una cuenta colaboradora referenciada queda restringido. No se alteran las asignaciones existentes de responsables ni se inventan colaboradores para cursos anteriores.
 
 `courses` conserva sus campos originales y añade:
 
@@ -16,12 +18,13 @@ El modelo organiza los cursos por especialidad y relaciona cada Coach con las ma
 | `specialty_id` | FK nullable a `specialties.id` | Asignatura o videojuego del curso; sustituye `category_id` |
 | `status` | `draft` por defecto; admite `draft` o `published` | Separar preparación y publicación |
 | `price` | `DECIMAL(10,2)`, obligatorio, 0 por defecto; CHECK >= 0 | Importe en euros; cero significa gratuito |
+| `cover_path` | Texto nullable, hasta 255 caracteres | Ruta interna de la portada en el disco privado local; no se expone en la API |
 
-Las FK admiten nulos para conservar cursos anteriores sin inventar responsables ni especialidades. El futuro endpoint deberá exigir asignaciones válidas, comprobar que el responsable tenga rol Coach y que pertenezca a la especialidad elegida; las FK por sí solas solo acreditan existencia. Las reglas de asignación al crear o publicar un curso siguen pendientes. Un administrador podrá asignar un Coach cuando se concrete el endpoint; no se asigna automáticamente un Student como responsable. El curso sigue teniendo un único Coach responsable.
+Las FK admiten nulos para conservar cursos anteriores sin inventar responsables ni especialidades. POST `/api/v1/courses` permite crear a Coach y Administrator, con un responsable elegido de rol Coach y perteneciente a la especialidad. El creador Coach debe pertenecer también a esa especialidad; Administrator no necesita pertenecer a ella. Las FK por sí solas solo acreditan existencia. El responsable es único y puede haber varios Coaches adicionales de la misma especialidad. Cada creador autorizado puede elegir el estado inicial draft/published; no hay todavía edición o cambio de estado de cursos existentes.
 
 Las eliminaciones de usuarios/especialidades referenciados por cursos se restringen: borrar una cuenta o especialidad no elimina cursos ni rompe referencias. No se añaden borrado lógico, pagos ni inscripciones. EUR es la moneda funcional acordada para esta primera versión; no hay conversión ni cobros. No se duplica el precio con un booleano `is_free`.
 
-Relaciones Eloquent utilizadas en pruebas: `User::specialties()` y `Specialty::coaches()` con belongsToMany; `Specialty::courses()` con hasMany; `Course::specialty()` y `Course::coach()` con belongsTo. `Specialty::coaches()` filtra por rol Coach, incluso si una asociación errónea de un Student se insertara directamente en la base. El filtro de lectura no sustituye la futura autorización de escritura. El precio del modelo Course se convierte a decimal de dos posiciones.
+Relaciones Eloquent utilizadas en pruebas: `User::specialties()`, `Specialty::coaches()` y `Course::additionalCoaches()` con belongsToMany; `Specialty::courses()` con hasMany; `Course::specialty()` y `Course::coach()` con belongsTo. `Specialty::coaches()` filtra por rol Coach, incluso si una asociación errónea de un Student se insertara directamente en la base. El filtro de lectura no sustituye la autorización de escritura del servidor. El precio del modelo Course se convierte a decimal de dos posiciones.
 
 ```mermaid
 erDiagram
@@ -29,6 +32,8 @@ erDiagram
     SPECIALTIES o|--o{ COURSES : specialty_id
     USERS ||--o{ COACH_SPECIALTY : coach_id
     SPECIALTIES ||--o{ COACH_SPECIALTY : specialty_id
+    COURSES ||--o{ COURSE_COACH : course_id
+    USERS ||--o{ COURSE_COACH : coach_id
     COURSES {
         bigint id PK
         bigint coach_id FK
@@ -37,6 +42,7 @@ erDiagram
         text description
         varchar status
         decimal price
+        varchar cover_path
     }
     SPECIALTIES {
         bigint id PK
@@ -46,9 +52,47 @@ erDiagram
         bigint coach_id PK,FK
         bigint specialty_id PK,FK
     }
+    COURSE_COACH {
+        bigint course_id PK,FK
+        bigint coach_id PK,FK
+    }
 ```
 
 ## Migraciones y comprobaciones
+
+### Creación de cursos
+
+POST `/api/v1/courses` requiere sesión Coach o Administrator y CSRF. Recibe `title` (obligatorio, hasta 255 caracteres), `description` (obligatoria, hasta 10000), `specialty_id` y `price` (0 a 99999999.99 EUR, máximo dos decimales con punto). `coach_id` permite elegir al responsable y es obligatorio para Administrator; para Coach es opcional y, si se omite, se utiliza el usuario de sesión por compatibilidad con la primera versión. El responsable elegido debe ser Coach de la especialidad. `additional_coach_ids` es opcional, con hasta 100 identificadores distintos de otros Coaches de la especialidad, sin repetir al responsable. El creador puede incluirse como colaborador si elige a otra persona como responsable. `status` es opcional, admite únicamente draft/published y conserva draft si se omite. Student recibe 403. Se elige al crear; no se publican automáticamente los borradores existentes.
+
+La creación admite JSON sin portada y `multipart/form-data` con un archivo opcional `cover`. Devuelve 201 con `data`: id, título, descripción, responsable, especialidad, estado, precio como cadena con dos decimales, `additional_coaches` (id/nombre) ordenados por nombre/id y `cover_url` (URL relativa protegida o null). No hay todavía GET completo de cursos ni URI individual de consulta del curso, por lo que no se devuelve Location. El contrato está en [OpenAPI](../backend/openapi.json).
+
+GET/HEAD `/api/v1/specialties` permite ahora al Coach consultar únicamente sus especialidades asignadas, con la paginación existente. Administrator conserva el catálogo completo y la creación de especialidades; Student sigue sin acceso. Un Coach sin asignaciones recibe una lista vacía y no puede crear un curso hasta que se le asigne una especialidad.
+
+GET/HEAD `/api/v1/specialties/{specialty}/coaches` permite consultar candidatos tras elegir especialidad. El Coach solo consulta grupos a los que pertenece; ahora la lista incluye a todos sus Coaches, también al usuario de sesión si está asignado, para permitir elegir responsable. Administrator consulta cualquier especialidad; Student no tiene acceso. Devuelve únicamente id/nombre con paginación y orden nombre/id, sin correos ni otros datos privados. Una especialidad inexistente devuelve 404 y una ajena al Coach devuelve 403. El frontend debe excluir al responsable elegido de la selección de colaboradores.
+
+La transacción de creación bloquea las filas del creador, el responsable y los colaboradores por id ascendente, igual que la edición administrativa, y vuelve a comprobar roles y pertenencia. Así, las operaciones HTTP no pueden quitar una asignación o cambiar el rol entre la comprobación y el guardado del curso. La edición administrativa tampoco puede retirar roles/especialidades que usan los cursos como responsable o colaborador.
+
+### Portada privada opcional
+
+`cover` admite contenido JPG/JPEG, PNG o WebP, hasta 2048 KiB y 4096 píxeles por dimensión. Se validan archivo, MIME de contenido, formato de imagen, tamaño y dimensiones; SVG se rechaza. No se instala GD ni se procesa/reescala la imagen en esta entrega. El nombre original no se utiliza para almacenar: Laravel genera el nombre en `storage/app/private/courses/covers`, dentro del volumen de storage existente. No se requiere enlace público ni cambio de Nginx. La configuración local conserva `serve=false` y no se habilita una ruta genérica de archivos.
+
+GET/HEAD `/api/v1/courses/{course}/cover` permite lectura sin sesión cuando el curso es visible en el catálogo público. Para borradores o cursos con asignaciones incompletas, mantiene acceso solo a Administrator y al Coach responsable/colaborador: 401 sin sesión o 403 sin permiso. Ser creador de un curso para otro Coach no concede lectura privada adicional si no se participa. Devuelve MIME real con `nosniff`, disposición inline y `Cache-Control: no-store, private`; ausencia de curso/archivo devuelve 404. `cover_path` no se expone. Las copias de storage/app ya incluyen estas imágenes y no se habilita un directorio público genérico.
+
+El archivo y la base de datos no comparten transacción: si falla la inserción tras almacenar la portada, se revierte la base y se elimina el archivo en el manejo de error. Un fallo excepcional de limpieza se registra para revisión, sin ocultar el error original. Una caída abrupta del proceso durante esa ventana aún puede dejar un archivo huérfano; no se afirma atomicidad distribuida. Los límites actuales del runtime comprobado son upload_max_filesize=2M, post_max_size=8M y Nginx 10m; los rechazos de infraestructura pueden ocurrir antes de la validación Laravel y no equivalen al error de campo 422.
+
+Regla acordada para la futura fase de lecciones: el Coach secundario no podrá eliminar el curso y podrá eliminar sus propias lecciones y materiales. No hay todavía endpoints de borrado de cursos, lecciones o materiales; esta decisión no acredita permisos de borrado implementados. No implica poder editar o borrar contenido ajeno ni retirarse del curso.
+
+En React se elige primero una especialidad, después su responsable y los colaboradores opcionales; al cambiar de especialidad se descartan las selecciones anteriores. Gratuito/de pago es un control de interfaz: el envío se normaliza a price=0 para gratuito y a un importe positivo para de pago. No se añade otro indicador de gratuidad a la base de datos. El formulario permite seleccionar el estado inicial y una portada opcional, envía FormData sin fijar Content-Type para que el navegador genere el boundary y muestra los errores por campo. Tras guardar, se reinicia el formulario y se confirma el estado devuelto por el servidor.
+
+### Catálogo público para tarjetas
+
+GET/HEAD `/api/v1/courses` no exige sesión. Devuelve solo publicados con especialidad existente y responsable de rol Coach asignado a esa especialidad, mediante el scope Eloquent `publiclyVisible`, compartido con el permiso de lectura pública de portadas. Los cursos heredados incompletos permanecen fuera del catálogo hasta tener asignaciones válidas. Ni un rol privilegiado ni parámetros adicionales de consulta amplían el catálogo a borradores.
+
+PublicCourseResource expone únicamente id, título, descripción, precio decimal, especialidad (id/nombre), responsable (id/nombre) y cover_url o null. No expone correos, rutas de disco, otros datos de usuarios o listas privadas de colaboradores. Paginación page >= 1 y per_page de 1 a 100, predeterminado 20, orden por id descendente, con data/links/meta. La respuesta no es almacenable. La gestión privada extendida queda para después.
+
+La página pública `/courses` consulta doce cursos por página y muestra tarjetas con portada, título, descripción, especialidad, responsable y precio/gratuidad. Incluye estados de carga, error y catálogo vacío, además de navegación entre páginas cuando corresponde. Los borradores existentes conservan su estado y no aparecen en el catálogo. La edición y publicación de cursos existentes, la inscripción y los cobros siguen pendientes.
+
+### Migraciones existentes
 
 Se conserva íntegra la migración original de courses. Nuevas migraciones:
 
@@ -56,6 +100,8 @@ Se conserva íntegra la migración original de courses. Nuevas migraciones:
 - [Ampliar courses](../backend/database/migrations/2026_11_15_000002_add_details_to_courses_table.php).
 - [Renombrar categoría como especialidad](../backend/database/migrations/2026_11_15_000003_rename_categories_to_specialties.php).
 - [Relacionar Coaches con especialidades](../backend/database/migrations/2026_11_15_000004_create_coach_specialty_table.php).
+- [Relacionar cursos con Coaches adicionales](../backend/database/migrations/2026_11_17_000001_create_course_coach_table.php).
+- [Añadir portada opcional](../backend/database/migrations/2026_11_18_000001_add_cover_path_to_courses_table.php).
 
 Las dos primeras migraciones ya aplicadas se conservan sin modificaciones. El renombrado usa operaciones nativas para conservar las FK y el CHECK de precio; PostgreSQL requiere además renombrar explícitamente la restricción de `courses.category_id`. El índice único del nombre conserva su nombre histórico, sin alterar su comportamiento. Las reversiones se prueban únicamente en bases aisladas; revertir la tabla intermedia elimina sus asociaciones y no es un procedimiento para reiniciar desarrollo.
 

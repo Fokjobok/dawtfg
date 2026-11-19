@@ -17,9 +17,8 @@ export default function AppLayout() {
             <span>Formación y coaching</span>
           </Link>
           <nav className={styles.navigation} aria-label="Navegación principal">
-            <NavLink to="/" end>
-              Inicio
-            </NavLink>
+            <NavLink to="/" end>Inicio</NavLink>
+            <NavLink to="/courses">Cursos</NavLink>
             <NavLink to="/account">Mi cuenta</NavLink>
           </nav>
         </Container>

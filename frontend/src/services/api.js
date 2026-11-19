@@ -13,8 +13,12 @@ export class ApiError extends Error {
 
 export async function apiRequest(path, { method = 'GET', body, signal } = {}) {
   const headers = { Accept: 'application/json' }
+  const isFormData = body instanceof FormData
 
-  if (body !== undefined) headers['Content-Type'] = 'application/json'
+  if (body !== undefined && !isFormData) {
+    headers['Content-Type'] = 'application/json'
+  }
+
   if (!['GET', 'HEAD'].includes(method)) {
     const cookie = document.cookie
       .split(';')
@@ -32,7 +36,7 @@ export async function apiRequest(path, { method = 'GET', body, signal } = {}) {
     credentials: 'same-origin',
     cache: 'no-store',
     signal: signal || AbortSignal.timeout(10000),
-    body: body === undefined ? undefined : JSON.stringify(body),
+    body: body === undefined || isFormData ? body : JSON.stringify(body),
   })
 
   if (response.status === 204) return null

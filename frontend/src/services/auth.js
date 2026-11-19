@@ -14,12 +14,7 @@ export async function prepareCsrf() {
 }
 
 export async function getSession() {
-  try {
-    return (await apiRequest('/user')).data
-  } catch (error) {
-    if (error instanceof ApiError && error.status === 401) return null
-    throw error
-  }
+  return (await apiRequest('/session')).data
 }
 
 export async function register(details) {

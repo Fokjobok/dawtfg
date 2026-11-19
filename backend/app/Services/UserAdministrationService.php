@@ -27,11 +27,14 @@ class UserAdministrationService
                     throw ValidationException::withMessages(['specialty_ids' => ['Only Coaches can have specialties.']]);
                 }
 
-                if ($role !== UserRole::Coach && Course::where('coach_id', $user->id)->exists()) {
+                $courses = Course::where(fn ($query) => $query->where('coach_id', $user->id)
+                    ->orWhereHas('additionalCoaches', fn ($coaches) => $coaches->whereKey($user->id)));
+
+                if ($role !== UserRole::Coach && (clone $courses)->exists()) {
                     throw ValidationException::withMessages(['role' => ['Reassign this Coach’s courses before changing the role.']]);
                 }
 
-                if ($role === UserRole::Coach && Course::where('coach_id', $user->id)->whereNotNull('specialty_id')->whereNotIn('specialty_id', $specialties)->exists()) {
+                if ($role === UserRole::Coach && (clone $courses)->whereNotNull('specialty_id')->whereNotIn('specialty_id', $specialties)->exists()) {
                     throw ValidationException::withMessages(['specialty_ids' => ['A specialty used by this Coach’s courses cannot be removed.']]);
                 }
 

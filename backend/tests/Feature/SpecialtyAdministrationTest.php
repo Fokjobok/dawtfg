@@ -30,10 +30,9 @@ final class SpecialtyAdministrationTest extends TestCase
     }
 
     #[DataProvider('otherRoles')]
-    public function test_only_administrators_can_list_or_create_specialties(UserRole $role): void
+    public function test_other_roles_cannot_create_specialties(UserRole $role): void
     {
         $this->actor($role);
-        $this->getJson('/api/v1/specialties')->assertForbidden();
         $this->postJson('/api/v1/specialties', ['name' => 'Programming'])->assertForbidden();
         $this->assertDatabaseCount('specialties', 0);
     }
@@ -41,6 +40,30 @@ final class SpecialtyAdministrationTest extends TestCase
     public static function otherRoles(): array
     {
         return [[UserRole::Coach], [UserRole::Student]];
+    }
+
+    public function test_students_cannot_list_specialties(): void
+    {
+        $this->actor(UserRole::Student);
+        $this->getJson('/api/v1/specialties')->assertForbidden();
+    }
+
+    public function test_coach_can_only_list_their_own_specialties_with_pagination(): void
+    {
+        $coach = $this->actor(UserRole::Coach);
+        $this->getJson('/api/v1/specialties')->assertOk()->assertJsonCount(0, 'data');
+        $first = Specialty::create(['name' => 'Counter-Strike']);
+        $second = Specialty::create(['name' => 'Valorant']);
+        $other = Specialty::create(['name' => 'Programming']);
+        $coach->specialties()->attach([$first->id, $second->id]);
+
+        $this->getJson('/api/v1/specialties?per_page=1&filter[coach_id]=0')->assertOk()
+            ->assertHeader('Cache-Control', 'no-store, private')
+            ->assertJsonPath('data.0.id', $first->id)->assertJsonPath('meta.total', 2)
+            ->assertJsonMissing(['id' => $other->id, 'name' => $other->name]);
+        $this->getJson('/api/v1/specialties?per_page=1&page=2')->assertOk()
+            ->assertJsonPath('data.0.id', $second->id)->assertJsonMissingPath('data.0.coaches');
+        $this->head('/api/v1/specialties')->assertOk()->assertContent('');
     }
 
     public function test_list_is_paginated_sorted_private_and_excludes_user_details(): void

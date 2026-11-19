@@ -126,6 +126,7 @@ it('saves edits and removes a user from the old role list after a role change', 
     name: 'Updated Coach',
     email: coach.email,
     role: 'Coach',
+    specialty_ids: [],
   })
   expect(screen.getByText('Updated Coach')).toBeTruthy()
 
