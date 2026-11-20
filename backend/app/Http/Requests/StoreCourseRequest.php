@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Enums\CourseLevel;
 use App\Enums\UserRole;
 use App\Models\Course;
 use Illuminate\Foundation\Http\FormRequest;
@@ -24,8 +25,9 @@ class StoreCourseRequest extends FormRequest
             'additional_coach_ids' => ['sometimes', 'array', 'max:100'],
             'additional_coach_ids.*' => ['required', 'integer', 'distinct', 'exists:users,id'],
             'coach_id' => [Rule::requiredIf($this->user()?->role === UserRole::Administrator), 'integer', 'exists:users,id'],
-            'cover' => ['sometimes', 'nullable', 'file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048', 'dimensions:max_width=4096,max_height=4096'],
+            'cover' => ['sometimes', 'nullable', 'file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048', 'dimensions:max_width=4096,max_height=2048'],
             'status' => ['sometimes', 'required', Rule::in(['draft', 'published'])],
+            'level' => ['sometimes', 'required', Rule::enum(CourseLevel::class)],
         ];
     }
 }

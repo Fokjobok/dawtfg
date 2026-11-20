@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\CourseLevel;
 use App\Enums\UserRole;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -10,6 +11,20 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Course extends Model
 {
+    public function scopeManagedBy(Builder $query, User $actor): Builder
+    {
+        if ($actor->role === UserRole::Administrator) {
+            return $query;
+        }
+
+        if ($actor->role !== UserRole::Coach) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query->where(fn ($courses) => $courses->where('coach_id', $actor->id)
+            ->orWhereHas('additionalCoaches', fn ($coaches) => $coaches->whereKey($actor->id)));
+    }
+
     public function scopePubliclyVisible(Builder $query): Builder
     {
         // Legacy nullable assignments do not make a course ready for the public catalog.
@@ -35,6 +50,6 @@ class Course extends Model
 
     protected function casts(): array
     {
-        return ['price' => 'decimal:2'];
+        return ['price' => 'decimal:2', 'level' => CourseLevel::class];
     }
 }

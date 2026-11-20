@@ -55,6 +55,7 @@ final class PublicCourseCatalogTest extends TestCase
                 'id' => $public->id,
                 'title' => $public->title,
                 'description' => $public->description,
+                'level' => null,
                 'price' => '0.00',
                 'specialty' => ['id' => $public->specialty_id, 'name' => $public->specialty->name],
                 'coach' => ['id' => $public->coach_id, 'name' => $public->coach->name],

@@ -19,8 +19,9 @@ El modelo organiza los cursos por especialidad y relaciona cada Coach con las ma
 | `status` | `draft` por defecto; admite `draft` o `published` | Separar preparación y publicación |
 | `price` | `DECIMAL(10,2)`, obligatorio, 0 por defecto; CHECK >= 0 | Importe en euros; cero significa gratuito |
 | `cover_path` | Texto nullable, hasta 255 caracteres | Ruta interna de la portada en el disco privado local; no se expone en la API |
+| `level` | Enum nullable: beginner, advanced, expert | Nivel del curso; null significa sin clasificar y conserva así los cursos anteriores |
 
-Las FK admiten nulos para conservar cursos anteriores sin inventar responsables ni especialidades. POST `/api/v1/courses` permite crear a Coach y Administrator, con un responsable elegido de rol Coach y perteneciente a la especialidad. El creador Coach debe pertenecer también a esa especialidad; Administrator no necesita pertenecer a ella. Las FK por sí solas solo acreditan existencia. El responsable es único y puede haber varios Coaches adicionales de la misma especialidad. Cada creador autorizado puede elegir el estado inicial draft/published; no hay todavía edición o cambio de estado de cursos existentes.
+Las FK admiten nulos para conservar cursos anteriores sin inventar responsables ni especialidades. POST `/api/v1/courses` permite crear a Coach y Administrator, con un responsable elegido de rol Coach y perteneciente a la especialidad. El creador Coach debe pertenecer también a esa especialidad; Administrator no necesita pertenecer a ella. Las FK por sí solas solo acreditan existencia. El responsable es único y puede haber varios Coaches adicionales de la misma especialidad. El estado inicial y su modificación posterior mediante PATCH admiten draft/published según los permisos de edición descritos más abajo.
 
 Las eliminaciones de usuarios/especialidades referenciados por cursos se restringen: borrar una cuenta o especialidad no elimina cursos ni rompe referencias. No se añaden borrado lógico, pagos ni inscripciones. EUR es la moneda funcional acordada para esta primera versión; no hay conversión ni cobros. No se duplica el precio con un booleano `is_free`.
 
@@ -43,6 +44,7 @@ erDiagram
         varchar status
         decimal price
         varchar cover_path
+        varchar level
     }
     SPECIALTIES {
         bigint id PK
@@ -62,9 +64,11 @@ erDiagram
 
 ### Creación de cursos
 
+El nivel se guarda mediante `CourseLevel`: beginner (principiante), advanced (avanzado) o expert (experto). POST acepta `level` opcional por compatibilidad con el formulario anterior; cuando se incluye se valida como uno de esos tres valores. Omitirlo guarda null, sin elegir un nivel por defecto. Las respuestas de creación y catálogo incluyen level como cadena o null. La migración conserva los cursos existentes sin clasificarlos automáticamente; sus docentes autorizados o Administrator pueden asignarlo posteriormente con PATCH courses/{course}.
+
 POST `/api/v1/courses` requiere sesión Coach o Administrator y CSRF. Recibe `title` (obligatorio, hasta 255 caracteres), `description` (obligatoria, hasta 10000), `specialty_id` y `price` (0 a 99999999.99 EUR, máximo dos decimales con punto). `coach_id` permite elegir al responsable y es obligatorio para Administrator; para Coach es opcional y, si se omite, se utiliza el usuario de sesión por compatibilidad con la primera versión. El responsable elegido debe ser Coach de la especialidad. `additional_coach_ids` es opcional, con hasta 100 identificadores distintos de otros Coaches de la especialidad, sin repetir al responsable. El creador puede incluirse como colaborador si elige a otra persona como responsable. `status` es opcional, admite únicamente draft/published y conserva draft si se omite. Student recibe 403. Se elige al crear; no se publican automáticamente los borradores existentes.
 
-La creación admite JSON sin portada y `multipart/form-data` con un archivo opcional `cover`. Devuelve 201 con `data`: id, título, descripción, responsable, especialidad, estado, precio como cadena con dos decimales, `additional_coaches` (id/nombre) ordenados por nombre/id y `cover_url` (URL relativa protegida o null). No hay todavía GET completo de cursos ni URI individual de consulta del curso, por lo que no se devuelve Location. El contrato está en [OpenAPI](../backend/openapi.json).
+La creación admite JSON sin portada y `multipart/form-data` con un archivo opcional `cover`. Devuelve 201 con `data`: id, título, descripción, responsable, especialidad, estado, nivel, precio como cadena con dos decimales, `additional_coaches` (id/nombre) ordenados por nombre/id y `cover_url` (URL relativa protegida o null). Location señala ahora la URI privada GET courses/{course}; no amplía los permisos de acceso. El contrato está en [OpenAPI](../backend/openapi.json).
 
 GET/HEAD `/api/v1/specialties` permite ahora al Coach consultar únicamente sus especialidades asignadas, con la paginación existente. Administrator conserva el catálogo completo y la creación de especialidades; Student sigue sin acceso. Un Coach sin asignaciones recibe una lista vacía y no puede crear un curso hasta que se le asigne una especialidad.
 
@@ -72,9 +76,23 @@ GET/HEAD `/api/v1/specialties/{specialty}/coaches` permite consultar candidatos 
 
 La transacción de creación bloquea las filas del creador, el responsable y los colaboradores por id ascendente, igual que la edición administrativa, y vuelve a comprobar roles y pertenencia. Así, las operaciones HTTP no pueden quitar una asignación o cambiar el rol entre la comprobación y el guardado del curso. La edición administrativa tampoco puede retirar roles/especialidades que usan los cursos como responsable o colaborador.
 
-### Portada privada opcional
+### Consulta y edición privadas
 
-`cover` admite contenido JPG/JPEG, PNG o WebP, hasta 2048 KiB y 4096 píxeles por dimensión. Se validan archivo, MIME de contenido, formato de imagen, tamaño y dimensiones; SVG se rechaza. No se instala GD ni se procesa/reescala la imagen en esta entrega. El nombre original no se utiliza para almacenar: Laravel genera el nombre en `storage/app/private/courses/covers`, dentro del volumen de storage existente. No se requiere enlace público ni cambio de Nginx. La configuración local conserva `serve=false` y no se habilita una ruta genérica de archivos.
+GET/HEAD `/api/v1/teaching/courses` lista los cursos del Coach como responsable o colaborador; Administrator consulta todos, incluidos borradores. GET/HEAD `/api/v1/courses/{course}` devuelve un curso editable. ManagedCourseResource añade responsable/especialidad con id/nombre (null si faltan en una fila heredada) y can_change_responsible. No expone correos ni rutas de disco. Las respuestas son privadas y no almacenables; Student, visitantes y Coaches no participantes no obtienen estos datos.
+
+PATCH `/api/v1/courses/{course}` requiere sesión y CSRF. Responsable, colaboradores y cualquier Administrator pueden cambiar título, descripción, nivel, precio, estado, especialidad, colaboradores y portada. La identidad protegida es el responsable actual; no se conserva otra cuenta de creador histórico. Un colaborador no puede sustituir al responsable; solo el responsable actual o Administrator pueden hacerlo. El responsable permanece separado de additional_coach_ids y vaciar esa lista no lo elimina. Un colaborador puede quitarse a sí mismo, tras lo que pierde acceso privado si no tiene otro permiso.
+
+El editor Coach debe pertenecer a la especialidad de destino. El responsable y todos los colaboradores resultantes deben ser Coaches asignados a ella; el cambio de materia no altera automáticamente el equipo. Omitir una propiedad conserva su valor. Cuando se incluyen level, coach_id o specialty_id, no se admiten nulos o vacíos. Administrator puede corregir asignaciones heredadas incompletas enviando un equipo válido.
+
+CourseUpdateService bloquea por id ascendente a editor y docentes anteriores/nuevos antes de bloquear el curso. Revalida autorización, roles y pertenencia con los registros actuales. Si el equipo cambia entre la lectura inicial y el bloqueo, responde 409 para recargar; no añade bloqueo optimista de todos los campos ni promete detectar una edición previa de texto. No hay endpoint DELETE de cursos, lecciones, inscripciones o cobros.
+
+### Almacenamiento de la portada
+
+Para editar sin archivo se utiliza PATCH JSON; para reemplazar la portada se envía POST multipart a la misma URI con _method=PATCH y CSRF. En multipart, additional_coach_ids admite los elementos de array habituales o una cadena JSON de hasta 4096 bytes (incluido [] para vaciar colaboradores junto con el archivo). La lista decodificada conserva los límites de 100 docentes y las validaciones de asignación. remove_cover=true retira la portada; no se combina con cover. La ruta interna no es editable.
+
+El reemplazo se almacena con nombre generado y el archivo anterior se elimina después de guardar la transacción. Si falla el guardado, el archivo anterior sigue disponible y se elimina el nuevo. Los fallos excepcionales de limpieza se registran sin ocultar el error original ni convertir un guardado confirmado en fallo. No se afirma atomicidad distribuida frente a caídas del proceso o una transacción externa que envolviera el servicio.
+
+`cover` admite contenido JPG/JPEG, PNG o WebP, hasta 2048 KiB, 4096 píxeles de ancho y 2048 de alto. Son máximos independientes: no se exigen dimensiones exactas ni una relación de aspecto fija. Se validan archivo, MIME de contenido, formato de imagen, tamaño y dimensiones; SVG se rechaza. No se instala GD ni se procesa/reescala la imagen en esta entrega. Las portadas existentes se conservan; el nuevo límite se aplica a nuevas subidas. El nombre original no se utiliza para almacenar: Laravel genera el nombre en `storage/app/private/courses/covers`, dentro del volumen de storage existente. No se requiere enlace público ni cambio de Nginx. La configuración local conserva `serve=false` y no se habilita una ruta genérica de archivos.
 
 GET/HEAD `/api/v1/courses/{course}/cover` permite lectura sin sesión cuando el curso es visible en el catálogo público. Para borradores o cursos con asignaciones incompletas, mantiene acceso solo a Administrator y al Coach responsable/colaborador: 401 sin sesión o 403 sin permiso. Ser creador de un curso para otro Coach no concede lectura privada adicional si no se participa. Devuelve MIME real con `nosniff`, disposición inline y `Cache-Control: no-store, private`; ausencia de curso/archivo devuelve 404. `cover_path` no se expone. Las copias de storage/app ya incluyen estas imágenes y no se habilita un directorio público genérico.
 
@@ -82,7 +100,7 @@ El archivo y la base de datos no comparten transacción: si falla la inserción 
 
 Regla acordada para la futura fase de lecciones: el Coach secundario no podrá eliminar el curso y podrá eliminar sus propias lecciones y materiales. No hay todavía endpoints de borrado de cursos, lecciones o materiales; esta decisión no acredita permisos de borrado implementados. No implica poder editar o borrar contenido ajeno ni retirarse del curso.
 
-En React se elige primero una especialidad, después su responsable y los colaboradores opcionales; al cambiar de especialidad se descartan las selecciones anteriores. Gratuito/de pago es un control de interfaz: el envío se normaliza a price=0 para gratuito y a un importe positivo para de pago. No se añade otro indicador de gratuidad a la base de datos. El formulario permite seleccionar el estado inicial y una portada opcional, envía FormData sin fijar Content-Type para que el navegador genere el boundary y muestra los errores por campo. Tras guardar, se reinicia el formulario y se confirma el estado devuelto por el servidor.
+En React se elige primero una especialidad, después su responsable y los colaboradores opcionales; al cambiar de especialidad se descartan las selecciones anteriores. Gratuito/de pago es un control de interfaz: el envío se normaliza a price=0 para gratuito y a un importe positivo para de pago. No se añade otro indicador de gratuidad a la base de datos. El formulario exige elegir un nivel y permite seleccionar el estado inicial y una portada opcional; envía FormData sin fijar Content-Type para que el navegador genere el boundary y muestra los errores por campo. La API conserva la posibilidad de omitir level para clientes anteriores. Tras guardar, se reinicia el formulario y se confirma el estado devuelto por el servidor.
 
 ### Catálogo público para tarjetas
 
@@ -90,7 +108,11 @@ GET/HEAD `/api/v1/courses` no exige sesión. Devuelve solo publicados con especi
 
 PublicCourseResource expone únicamente id, título, descripción, precio decimal, especialidad (id/nombre), responsable (id/nombre) y cover_url o null. No expone correos, rutas de disco, otros datos de usuarios o listas privadas de colaboradores. Paginación page >= 1 y per_page de 1 a 100, predeterminado 20, orden por id descendente, con data/links/meta. La respuesta no es almacenable. La gestión privada extendida queda para después.
 
-La página pública `/courses` consulta doce cursos por página y muestra tarjetas con portada, título, descripción, especialidad, responsable y precio/gratuidad. Incluye estados de carga, error y catálogo vacío, además de navegación entre páginas cuando corresponde. Los borradores existentes conservan su estado y no aparecen en el catálogo. La edición y publicación de cursos existentes, la inscripción y los cobros siguen pendientes.
+La representación pública añade level (cadena o null). El catálogo admite filtros exactos `filter[specialty_id]` y `filter[level]`, combinables y anteriores a la paginación. Sin filtro de nivel aparecen también los cursos sin clasificar. Los filtros no permiten leer borradores ni cursos con asignaciones inválidas. El orden sigue siendo id descendente; no existe todavía una fecha de publicación independiente ni una ordenación configurable.
+
+GET/HEAD `/api/v1/catalog/specialties` ofrece las opciones públicas del filtro: especialidades con cursos visibles, sin duplicados, id/nombre únicamente, orden por nombre/id y paginación habitual. No amplía el acceso al catálogo administrativo de especialidades. La interfaz prevista mantiene un único listado general con filtros opcionales de especialidad y nivel, sin separar los resultados en secciones por videojuego.
+
+La página pública `/courses` consulta doce cursos por página y muestra tarjetas con portada, título, descripción, especialidad, responsable y precio/gratuidad. Incluye filtro de nivel, estados de carga, error y catálogo vacío, además de navegación entre páginas cuando corresponde; cambiar el nivel reinicia la página a 1. Los borradores conservan su estado y no aparecen en el catálogo. El editor protegido `/courses/:courseId/edit` carga el curso y permite cambiar su nivel mediante PATCH, con errores por campo y bloqueo durante el envío. La ampliación del editor a los demás campos y su entrada desde la gestión de cuenta, el selector público de especialidad, la inscripción y los cobros siguen pendientes.
 
 ### Migraciones existentes
 
@@ -102,6 +124,7 @@ Se conserva íntegra la migración original de courses. Nuevas migraciones:
 - [Relacionar Coaches con especialidades](../backend/database/migrations/2026_11_15_000004_create_coach_specialty_table.php).
 - [Relacionar cursos con Coaches adicionales](../backend/database/migrations/2026_11_17_000001_create_course_coach_table.php).
 - [Añadir portada opcional](../backend/database/migrations/2026_11_18_000001_add_cover_path_to_courses_table.php).
+- [Añadir nivel opcional](../backend/database/migrations/2026_11_20_000001_add_level_to_courses_table.php).
 
 Las dos primeras migraciones ya aplicadas se conservan sin modificaciones. El renombrado usa operaciones nativas para conservar las FK y el CHECK de precio; PostgreSQL requiere además renombrar explícitamente la restricción de `courses.category_id`. El índice único del nombre conserva su nombre histórico, sin alterar su comportamiento. Las reversiones se prueban únicamente en bases aisladas; revertir la tabla intermedia elimina sus asociaciones y no es un procedimiento para reiniciar desarrollo.
 

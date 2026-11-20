@@ -21,7 +21,7 @@ export default function CourseCard({ course }) {
             loading="lazy"
             decoding="async"
             width={640}
-            height={360}
+            height={320}
           />
         )}
       </div>

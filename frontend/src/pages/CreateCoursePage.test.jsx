@@ -55,6 +55,9 @@ async function fillCourse() {
   const collaborators = screen.getByLabelText('Coaches colaboradores')
   collaborators.options[0].selected = true
   fireEvent.change(collaborators)
+  fireEvent.change(screen.getByLabelText('Nivel del curso'), {
+    target: { value: 'expert' },
+  })
 
   return screen
     .getByRole('button', { name: 'Guardar borrador' })
@@ -69,6 +72,7 @@ it('associates validation errors with every field and preserves entered data', a
       description: ['Invalid description'],
       specialty_id: ['Invalid specialty'],
       coach_id: ['Invalid responsible Coach'],
+      level: ['Invalid level'],
       additional_coach_ids: ['Invalid collaborator list'],
       'additional_coach_ids.0': ['Invalid additional Coach'],
     },
@@ -84,6 +88,7 @@ it('associates validation errors with every field and preserves entered data', a
     ['Descripción', 'Invalid description'],
     ['Videojuego o materia', 'Invalid specialty'],
     ['Coach responsable', 'Invalid responsible Coach'],
+    ['Nivel del curso', 'Invalid level'],
     ['Coaches colaboradores', 'Invalid additional Coach'],
   ]) {
     const control = screen.getByLabelText(label)
@@ -98,6 +103,7 @@ it('associates validation errors with every field and preserves entered data', a
 
   expect(screen.getByLabelText('Título').value).toBe('JavaScript course')
   expect(screen.getByLabelText('Coach responsable').value).toBe('2')
+  expect(screen.getByLabelText('Nivel del curso').value).toBe('expert')
   expect(
     screen.getByLabelText('Coaches colaboradores').selectedOptions[0].value,
   ).toBe('3')
@@ -125,6 +131,10 @@ it('blocks the form during submission and announces success after resetting it',
   )
   fireEvent.submit(form)
   expect(createCourse).toHaveBeenCalledTimes(1)
+  expect(createCourse).toHaveBeenCalledWith(
+    expect.objectContaining({ level: 'expert' }),
+    null,
+  )
 
   await act(async () => {
     finishSaving({ id: 9, title: 'JavaScript course' })
@@ -138,4 +148,5 @@ it('blocks the form during submission and announces success after resetting it',
   )
   expect(screen.getByLabelText('Título').value).toBe('')
   expect(screen.getByLabelText('Videojuego o materia').value).toBe('')
+  expect(screen.getByLabelText('Nivel del curso').value).toBe('')
 })

@@ -58,7 +58,8 @@ final class CourseCreationTest extends TestCase
 
         $response = $this->actingAs($coach)->postJson('/api/v1/courses', $details)
             ->assertCreated()->assertHeader('Cache-Control', 'no-store, private');
-        $response->assertExactJson(['data' => ['id' => $response->json('data.id'), ...$details, 'coach_id' => $coach->id, 'status' => 'draft', 'additional_coaches' => [], 'cover_url' => null]]);
+        $response->assertHeader('Location', '/api/v1/courses/'.$response->json('data.id'));
+        $response->assertExactJson(['data' => ['id' => $response->json('data.id'), ...$details, 'coach_id' => $coach->id, 'status' => 'draft', 'level' => null, 'additional_coaches' => [], 'cover_url' => null]]);
         $this->assertDatabaseHas('courses', ['id' => $response->json('data.id'), 'coach_id' => $coach->id, 'status' => 'draft', 'title' => $details['title'], 'specialty_id' => $details['specialty_id']]);
         $this->assertSame('19.90', Course::firstOrFail()->price);
 

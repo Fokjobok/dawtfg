@@ -16,6 +16,7 @@ const initialForm = {
   pricingType: 'free',
   price: '',
   status: 'draft',
+  level: '',
 }
 
 export default function CreateCoursePage() {
@@ -345,6 +346,22 @@ export default function CreateCoursePage() {
               </FormField>
             </fieldset>
           )}
+
+          <FormField
+            as="select"
+            id="course-level"
+            name="level"
+            label="Nivel del curso"
+            value={form.level}
+            onChange={handleChange}
+            errors={errors.level}
+            required
+          >
+            <option value="">Selecciona un nivel</option>
+            <option value="beginner">Principiante</option>
+            <option value="advanced">Avanzado</option>
+            <option value="expert">Experto</option>
+          </FormField>
 
           <FormField
             as="select"

@@ -57,7 +57,7 @@ final class CourseCoverTest extends TestCase
     {
         $owner = $this->user();
         $details = $this->details($owner);
-        $bytes = $this->png();
+        $bytes = $this->png(4096, 2048);
         $response = $this->actingAs($owner)->post('/api/v1/courses', [...$details, 'cover' => UploadedFile::fake()->createWithContent('original.png', $bytes)], ['Accept' => 'application/json'])
             ->assertCreated()->assertJsonMissingPath('data.cover_path');
         $course = Course::findOrFail($response->json('data.id'));
@@ -113,6 +113,7 @@ final class CourseCoverTest extends TestCase
             UploadedFile::fake()->createWithContent('cover.svg', '<svg xmlns="http://www.w3.org/2000/svg"/>'),
             UploadedFile::fake()->createWithContent('large.png', $this->png().str_repeat('x', 2 * 1024 * 1024)),
             UploadedFile::fake()->createWithContent('wide.png', $this->png(4097)),
+            UploadedFile::fake()->createWithContent('tall.png', $this->png(1, 2049)),
         ] as $cover) {
             $this->post('/api/v1/courses', [...$details, 'cover' => $cover], ['Accept' => 'application/json'])
                 ->assertUnprocessable()->assertJsonValidationErrors('cover');

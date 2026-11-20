@@ -17,4 +17,5 @@ Route::prefix('api/v1')->group(function (): void {
     Route::patch('users/{user}', [UserController::class, 'update'])->whereNumber('user')->middleware('auth:sanctum')->name('api.v1.users.update');
     Route::post('specialties', [SpecialtyController::class, 'store'])->middleware('auth:sanctum')->name('api.v1.specialties.store');
     Route::post('courses', [CourseController::class, 'store'])->middleware('auth:sanctum')->name('api.v1.courses.store');
+    Route::patch('courses/{course}', [CourseController::class, 'update'])->whereNumber('course')->middleware('auth:sanctum')->name('api.v1.courses.update');
 });

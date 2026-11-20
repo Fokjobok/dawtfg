@@ -3,17 +3,19 @@ import Button from '../components/Button.jsx'
 import CourseCard from '../components/CourseCard.jsx'
 import { getCourses } from '../services/courses.js'
 import styles from './CoursesPage.module.scss'
+import FormField from '../components/FormField.jsx'
 
 export default function CoursesPage() {
   const [courses, setCourses] = useState([])
   const [page, setPage] = useState(1)
   const [pagination, setPagination] = useState(null)
   const [status, setStatus] = useState('loading')
+  const [level, setLevel] = useState('')
 
   useEffect(() => {
     let active = true
 
-    getCourses(page)
+    getCourses(page, { level })
       .then((response) => {
         if (!active) return
 
@@ -30,7 +32,17 @@ export default function CoursesPage() {
     return () => {
       active = false
     }
-  }, [page])
+  }, [page, level])
+
+  function handleLevelChange(event) {
+    const nextLevel = event.target.value
+
+    if (nextLevel === level) return
+
+    setStatus('loading')
+    setPage(1)
+    setLevel(nextLevel)
+  }
 
   function changePage(nextPage) {
     setStatus('loading')
@@ -45,6 +57,19 @@ export default function CoursesPage() {
         Descubre nuestros cursos y encuentra lo que quieres aprender.
       </p>
 
+      <FormField
+        as="select"
+        id="filter-level"
+        label="Nivel"
+        value={level}
+        onChange={handleLevelChange}
+      >
+        <option value="">Todos los niveles</option>
+        <option value="beginner">Principiante</option>
+        <option value="advanced">Avanzado</option>
+        <option value="expert">Experto</option>
+      </FormField>
+
       {status === 'loading' && <p role="status">Cargando cursos…</p>}
 
       {status === 'error' && (
@@ -56,7 +81,11 @@ export default function CoursesPage() {
       {status === 'ready' && (
         <>
           {courses.length === 0 ? (
-            <p>Todavía no hay cursos publicados.</p>
+            <p>
+              {level
+                ? 'No hay cursos con el nivel seleccionado.'
+                : 'Todavía no hay cursos publicados.'}
+            </p>
           ) : (
             <div className={styles.grid}>
               {courses.map((course) => (

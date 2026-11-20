@@ -16,6 +16,7 @@ class CourseResource extends JsonResource
             'coach_id' => $this->coach_id,
             'specialty_id' => $this->specialty_id,
             'status' => $this->status,
+            'level' => $this->level?->value,
             'price' => $this->price,
             'additional_coaches' => CoachResource::collection($this->whenLoaded('additionalCoaches')),
             'cover_url' => $this->cover_path ? route('api.v1.courses.cover', ['course' => $this->id], false) : null,

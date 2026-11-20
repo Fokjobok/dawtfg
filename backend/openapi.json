@@ -760,7 +760,8 @@
                 "specialty_id": 1,
                 "price": "19.90",
                 "coach_id": 2,
-                "status": "draft"
+                "status": "draft",
+                "level": "beginner"
               }
             },
             "multipart/form-data": {
@@ -788,8 +789,18 @@
                     "coach_id": 2,
                     "status": "draft",
                     "additional_coaches": [],
-                    "cover_url": null
+                    "cover_url": null,
+                    "level": "beginner"
                   }
+                }
+              }
+            },
+            "headers": {
+              "Location": {
+                "description": "URI de consulta privada del curso, sujeta a permisos de edición; no concede acceso al creador si eligió otro responsable y no participa.",
+                "schema": {
+                  "type": "string",
+                  "format": "uri-reference"
                 }
               }
             }
@@ -817,7 +828,7 @@
         ],
         "operationId": "listPublicCourses",
         "summary": "Consulta el catálogo público de cursos publicados",
-        "description": "Sin sesión obligatoria. Solo cursos published con especialidad existente y responsable de rol Coach asignado a ella; los cursos heredados incompletos no se muestran. Mismo alcance para cualquier rol. Parámetros ajenos a esta operación no permiten consultar borradores. Orden id descendente, respuesta paginada, sin correos, rutas internas o listas privadas de usuarios. No implica inscripción ni pagos.",
+        "description": "Sin sesión obligatoria. Solo cursos published con especialidad existente y responsable de rol Coach asignado a ella; los cursos heredados incompletos no se muestran. Mismo alcance para cualquier rol. Parámetros ajenos a esta operación no permiten consultar borradores. Orden id descendente, respuesta paginada, sin correos, rutas internas o listas privadas de usuarios. No implica inscripción ni pagos. Admite filtros combinables filter[specialty_id] y filter[level], aplicados antes de paginar. Mantiene publicados y asignaciones válidas; los filtros no amplían permisos. El orden actual es id descendente (creación más reciente), no una fecha de publicación independiente.",
         "security": [],
         "parameters": [
           {
@@ -838,6 +849,25 @@
               "maximum": 100,
               "default": 20
             }
+          },
+          {
+            "name": "filter[specialty_id]",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "description": "Especialidad del curso. Una especialidad inexistente o sin cursos visibles produce una colección vacía."
+          },
+          {
+            "name": "filter[level]",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/CourseLevel"
+            },
+            "description": "Nivel exacto. Se combina con la especialidad antes de paginar. Sin este filtro también se incluyen cursos sin clasificar."
           }
         ],
         "responses": {
@@ -885,6 +915,25 @@
               "maximum": 100,
               "default": 20
             }
+          },
+          {
+            "name": "filter[specialty_id]",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "description": "Especialidad del curso. Una especialidad inexistente o sin cursos visibles produce una colección vacía."
+          },
+          {
+            "name": "filter[level]",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/CourseLevel"
+            },
+            "description": "Nivel exacto. Se combina con la especialidad antes de paginar. Sin este filtro también se incluyen cursos sin clasificar."
           }
         ],
         "responses": {
@@ -897,7 +946,8 @@
           "500": {
             "description": "Error interno, sin cuerpo."
           }
-        }
+        },
+        "description": " Admite filtros combinables filter[specialty_id] y filter[level], aplicados antes de paginar. Mantiene publicados y asignaciones válidas; los filtros no amplían permisos. El orden actual es id descendente (creación más reciente), no una fecha de publicación independiente."
       }
     },
     "/api/v1/specialties/{specialty}/coaches": {
@@ -1209,6 +1259,401 @@
           },
           "500": {
             "description": "Error interno."
+          }
+        }
+      }
+    },
+    "/api/v1/catalog/specialties": {
+      "get": {
+        "tags": [
+          "Cursos"
+        ],
+        "operationId": "listCatalogSpecialties",
+        "summary": "Especialidades del catálogo público",
+        "security": [],
+        "description": "Consulta pública y paginada de id/nombre de especialidades con cursos publicados y asignaciones válidas. Orden por nombre/id. No expone grupos privados o vacíos ni permite gestionar especialidades. La consulta administrativa GET /specialties conserva sus permisos.",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Especialidades con cursos visibles en el catálogo público; respuesta no almacenable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpecialtyCollection"
+                }
+              }
+            }
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      },
+      "head": {
+        "tags": [
+          "Cursos"
+        ],
+        "operationId": "headCatalogSpecialties",
+        "summary": "Cabeceras de las especialidades del catálogo",
+        "security": [],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cabeceras sin cuerpo."
+          },
+          "422": {
+            "description": "Parámetros inválidos; sin cuerpo."
+          },
+          "500": {
+            "description": "Error interno; sin cuerpo."
+          }
+        },
+        "description": "Consulta pública y paginada de id/nombre de especialidades con cursos publicados y asignaciones válidas. Orden por nombre/id. No expone grupos privados o vacíos ni permite gestionar especialidades. La consulta administrativa GET /specialties conserva sus permisos."
+      }
+    },
+    "/api/v1/courses/{course}": {
+      "get": {
+        "tags": [
+          "Cursos"
+        ],
+        "operationId": "showManagedCourse",
+        "summary": "Consultar un curso para editarlo",
+        "description": "Consulta privada para responsable, colaboradores y cualquier Administrator. Incluye borradores y cursos heredados incompletos; no es una ficha pública.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "course",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Curso editable; no-store/private.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagedCourseResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "description": "Curso inexistente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      },
+      "head": {
+        "tags": [
+          "Cursos"
+        ],
+        "operationId": "headManagedCourse",
+        "summary": "Cabeceras de un curso editable",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "course",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cabeceras sin cuerpo."
+          },
+          "401": {
+            "description": "Cabeceras sin cuerpo."
+          },
+          "403": {
+            "description": "Cabeceras sin cuerpo."
+          },
+          "404": {
+            "description": "Cabeceras sin cuerpo."
+          },
+          "500": {
+            "description": "Cabeceras sin cuerpo."
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Cursos"
+        ],
+        "operationId": "updateCourse",
+        "summary": "Editar un curso existente",
+        "description": "Responsable, colaboradores y Administrator editan título, descripción, nivel, precio, estado, portada, especialidad y colaboradores. Un colaborador no puede sustituir al responsable. Coach elige una especialidad propia y todos los docentes deben pertenecer a ella. JSON usa PATCH; multipart usa POST a esta URI con _method=PATCH y CSRF. Se acepta [] en JSON o cadena JSON [] en multipart para vaciar colaboradores, conservando el responsable. Omitir cover lo conserva; remove_cover=true lo elimina. No existe DELETE de cursos.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "course",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "X-XSRF-TOKEN",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Token URL-decodificado de la cookie; Swagger lo prepara automáticamente."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCourseInput"
+              },
+              "example": {
+                "level": "beginner"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCourseMultipartInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Curso editable; no-store/private.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagedCourseResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "description": "Curso inexistente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "El equipo docente cambió durante el guardado; recargar antes de reintentar.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "419": {
+            "$ref": "#/components/responses/SessionExpired"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/v1/teaching/courses": {
+      "get": {
+        "tags": [
+          "Cursos"
+        ],
+        "operationId": "listManagedCourses",
+        "summary": "Listar cursos gestionables",
+        "description": "Coach consulta cursos donde es responsable o colaborador; Administrator consulta todos. Incluye borradores. Orden id descendente y page/per_page habituales. No son inscripciones del alumno.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cursos gestionables; no-store/private.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagedCourseCollection"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      },
+      "head": {
+        "tags": [
+          "Cursos"
+        ],
+        "operationId": "headManagedCourses",
+        "summary": "Cabeceras del listado privado de cursos",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cabeceras sin cuerpo."
+          },
+          "401": {
+            "description": "Cabeceras sin cuerpo."
+          },
+          "403": {
+            "description": "Cabeceras sin cuerpo."
+          },
+          "422": {
+            "description": "Cabeceras sin cuerpo."
+          },
+          "500": {
+            "description": "Cabeceras sin cuerpo."
           }
         }
       }
@@ -1664,6 +2109,10 @@
             ],
             "default": "draft",
             "description": "Estado inicial elegido al crear. Si se omite, se conserva draft. No modifica cursos ya existentes."
+          },
+          "level": {
+            "$ref": "#/components/schemas/CourseLevel",
+            "description": "Opcional por compatibilidad. Si se incluye, debe ser uno de los tres niveles. Si se omite, el curso queda sin clasificar; no se asigna un nivel automáticamente."
           }
         }
       },
@@ -1678,7 +2127,8 @@
           "status",
           "price",
           "additional_coaches",
-          "cover_url"
+          "cover_url",
+          "level"
         ],
         "additionalProperties": false,
         "properties": {
@@ -1730,6 +2180,17 @@
               }
             ],
             "description": "URL relativa de la portada o null. Visible sin sesión si el curso pertenece al catálogo público; para borradores y cursos incompletos requiere permiso."
+          },
+          "level": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CourseLevel"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "null indica que el nivel todavía no se ha clasificado."
           }
         }
       },
@@ -1907,7 +2368,7 @@
           "cover": {
             "type": "string",
             "format": "binary",
-            "description": "Portada opcional JPG/JPEG, PNG o WebP. Máximo 2048 KiB y 4096×4096 píxeles. Contenido de imagen validado; no se admite SVG. Se almacena con nombre generado en disco privado."
+            "description": "Portada opcional JPG/JPEG, PNG o WebP. Máximo 2048 KiB, 4096 píxeles de ancho y 2048 de alto. No exige dimensiones exactas ni una relación de aspecto fija. Contenido de imagen validado; no se admite SVG. Se almacena con nombre generado en disco privado."
           },
           "status": {
             "type": "string",
@@ -1917,6 +2378,10 @@
             ],
             "default": "draft",
             "description": "Estado inicial elegido al crear. Si se omite, se conserva draft. No modifica cursos ya existentes."
+          },
+          "level": {
+            "$ref": "#/components/schemas/CourseLevel",
+            "description": "Opcional por compatibilidad. Si se incluye, debe ser uno de los tres niveles. Si se omite, el curso queda sin clasificar; no se asigna un nivel automáticamente."
           }
         }
       },
@@ -1930,7 +2395,8 @@
           "price",
           "specialty",
           "coach",
-          "cover_url"
+          "cover_url",
+          "level"
         ],
         "properties": {
           "id": {
@@ -1965,6 +2431,17 @@
               }
             ],
             "description": "Portada accesible sin sesión mientras el curso sea visible en el catálogo, o null."
+          },
+          "level": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CourseLevel"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "null indica que el nivel todavía no se ha clasificado."
           }
         }
       },
@@ -2035,6 +2512,371 @@
             }
           }
         }
+      },
+      "CourseLevel": {
+        "type": "string",
+        "enum": [
+          "beginner",
+          "advanced",
+          "expert"
+        ],
+        "description": "Nivel del curso: principiante, avanzado o experto."
+      },
+      "ManagedCourse": {
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "description",
+          "coach_id",
+          "specialty_id",
+          "status",
+          "price",
+          "additional_coaches",
+          "cover_url",
+          "level",
+          "coach",
+          "specialty",
+          "can_change_responsible"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "coach_id": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "specialty_id": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "published"
+            ]
+          },
+          "price": {
+            "type": "string",
+            "pattern": "^[0-9]+\\.[0-9]{2}$",
+            "description": "Importe en EUR con exactamente dos decimales."
+          },
+          "additional_coaches": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Coach"
+            },
+            "description": "Coaches adicionales; el responsable continúa en coach_id."
+          },
+          "cover_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uri-reference"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "URL relativa de la portada o null. Visible sin sesión si el curso pertenece al catálogo público; para borradores y cursos incompletos requiere permiso."
+          },
+          "level": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CourseLevel"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "null indica que el nivel todavía no se ha clasificado."
+          },
+          "coach": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Coach"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "specialty": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Specialty"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "can_change_responsible": {
+            "type": "boolean",
+            "description": "true para Administrator o el responsable actual; el servidor verifica siempre el permiso."
+          }
+        }
+      },
+      "ManagedCourseResponse": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ManagedCourse"
+          }
+        }
+      },
+      "ManagedCourseCollection": {
+        "type": "object",
+        "required": [
+          "data",
+          "links",
+          "meta"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ManagedCourse"
+            }
+          },
+          "links": {
+            "type": "object",
+            "properties": {
+              "first": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "last": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "prev": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "next": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          },
+          "meta": {
+            "type": "object",
+            "required": [
+              "current_page",
+              "last_page",
+              "per_page",
+              "total"
+            ],
+            "properties": {
+              "current_page": {
+                "type": "integer"
+              },
+              "last_page": {
+                "type": "integer"
+              },
+              "per_page": {
+                "type": "integer"
+              },
+              "total": {
+                "type": "integer"
+              }
+            }
+          }
+        }
+      },
+      "UpdateCourseInput": {
+        "type": "object",
+        "description": "Actualización parcial: omitir un campo conserva su valor. Nivel, responsable y especialidad no se pueden vaciar.",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 10000
+          },
+          "specialty_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Identificador de una especialidad asignada al Coach autenticado."
+          },
+          "price": {
+            "oneOf": [
+              {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 99999999.99,
+                "multipleOf": 0.01
+              },
+              {
+                "type": "string",
+                "minLength": 1
+              }
+            ],
+            "description": "Importe decimal entre 0 y 99999999.99 EUR, máximo dos decimales. Como texto, usar punto decimal; no se admiten coma ni notación científica. Se valida también el límite numérico de las cadenas."
+          },
+          "additional_coach_ids": {
+            "type": "array",
+            "maxItems": 100,
+            "uniqueItems": true,
+            "items": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "description": "Opcional: conserva la lista si se omite; [] la vacía sin quitar al responsable. Todos deben ser Coaches de la especialidad y distintos del responsable."
+          },
+          "coach_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Opcional. Solo el responsable actual o Administrator pueden sustituirlo; colaboradores pueden enviar el mismo identificador, pero no otro."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "published"
+            ],
+            "description": "Opcional: conserva el estado si se omite. Ambos estados permitidos a los editores autorizados."
+          },
+          "level": {
+            "$ref": "#/components/schemas/CourseLevel",
+            "description": "Opcional: conservar si se omite; si se incluye, elegir uno de los tres niveles."
+          },
+          "remove_cover": {
+            "type": "boolean",
+            "description": "Elimina la portada actual después de guardar. No combinar con cover."
+          }
+        },
+        "minProperties": 1
+      },
+      "UpdateCourseMultipartInput": {
+        "type": "object",
+        "description": "Actualización parcial: omitir un campo conserva su valor. Nivel, responsable y especialidad no se pueden vaciar.",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 10000
+          },
+          "specialty_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Identificador de una especialidad asignada al Coach autenticado."
+          },
+          "price": {
+            "oneOf": [
+              {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 99999999.99,
+                "multipleOf": 0.01
+              },
+              {
+                "type": "string",
+                "minLength": 1
+              }
+            ],
+            "description": "Importe decimal entre 0 y 99999999.99 EUR, máximo dos decimales. Como texto, usar punto decimal; no se admiten coma ni notación científica. Se valida también el límite numérico de las cadenas."
+          },
+          "additional_coach_ids": {
+            "oneOf": [
+              {
+                "type": "array",
+                "maxItems": 100,
+                "uniqueItems": true,
+                "items": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "description": "Opcional: conserva la lista si se omite; [] la vacía sin quitar al responsable. Todos deben ser Coaches de la especialidad y distintos del responsable."
+              },
+              {
+                "type": "string",
+                "maxLength": 4096,
+                "description": "Array JSON de identificadores, también [] para vaciar el equipo adicional en la misma subida."
+              }
+            ]
+          },
+          "coach_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Opcional. Solo el responsable actual o Administrator pueden sustituirlo; colaboradores pueden enviar el mismo identificador, pero no otro."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "published"
+            ],
+            "description": "Opcional: conserva el estado si se omite. Ambos estados permitidos a los editores autorizados."
+          },
+          "level": {
+            "$ref": "#/components/schemas/CourseLevel",
+            "description": "Opcional: conservar si se omite; si se incluye, elegir uno de los tres niveles."
+          },
+          "remove_cover": {
+            "type": "boolean",
+            "description": "Elimina la portada actual después de guardar. No combinar con cover."
+          },
+          "cover": {
+            "type": "string",
+            "format": "binary",
+            "description": "Portada opcional JPG/JPEG, PNG o WebP. Máximo 2048 KiB, 4096 píxeles de ancho y 2048 de alto. No exige dimensiones exactas ni una relación de aspecto fija. Contenido de imagen validado; no se admite SVG. Se almacena con nombre generado en disco privado."
+          },
+          "_method": {
+            "type": "string",
+            "const": "PATCH",
+            "description": "Enviar multipart mediante POST a la misma URI con este campo."
+          }
+        },
+        "minProperties": 2,
+        "required": [
+          "_method"
+        ]
       }
     },
     "responses": {

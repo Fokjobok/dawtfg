@@ -11,6 +11,7 @@ export async function createCourse(details, cover = null) {
     'coach_id',
     'price',
     'status',
+    'level',
   ]
 
   for (const field of fields) {
@@ -38,6 +39,39 @@ export async function createCourse(details, cover = null) {
   return response.data
 }
 
-export async function getCourses(page = 1) {
-  return apiRequest(`/courses?page=${page}&per_page=12`)
+export async function getCourses(page = 1, filters = {}) {
+  const params = new URLSearchParams({
+    page: String(page),
+    per_page: '12',
+  })
+
+  if (filters.level) {
+    params.set('filter[level]', filters.level)
+  }
+
+  if (filters.specialty_id) {
+    params.set('filter[specialty_id]', String(filters.specialty_id))
+  }
+
+  return apiRequest(`/courses?${params}`)
+}
+
+export async function getCourse(courseId) {
+  const response = await apiRequest(`/courses/${encodeURIComponent(courseId)}`)
+
+  return response.data
+}
+
+export async function updateCourse(courseId, details) {
+  await prepareCsrf()
+
+  const response = await apiRequest(
+    `/courses/${encodeURIComponent(courseId)}`,
+    {
+      method: 'PATCH',
+      body: details,
+    },
+  )
+
+  return response.data
 }

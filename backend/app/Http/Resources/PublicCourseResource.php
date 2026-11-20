@@ -13,6 +13,7 @@ class PublicCourseResource extends JsonResource
             'id' => $this->id,
             'title' => $this->title,
             'description' => $this->description,
+            'level' => $this->level?->value,
             'price' => $this->price,
             'specialty' => new SpecialtyResource($this->whenLoaded('specialty')),
             'coach' => new CoachResource($this->whenLoaded('coach')),

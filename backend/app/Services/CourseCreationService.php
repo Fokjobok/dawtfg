@@ -65,6 +65,7 @@ class CourseCreationService
                 $course->specialty_id = $attributes['specialty_id'];
                 $course->coach_id = $ownerId;
                 $course->status = $attributes['status'] ?? 'draft';
+                $course->level = $attributes['level'] ?? null;
                 $course->cover_path = $coverPath;
                 $course->save();
                 $course->additionalCoaches()->sync($additionalIds);

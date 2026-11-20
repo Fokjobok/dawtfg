@@ -1,3 +1,5 @@
+@use '../styles/mixins';
+
 .intro {
   margin-block: var(--space-4) var(--space-6);
   color: var(--color-muted);
@@ -5,8 +7,12 @@
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-6);
+
+  @include mixins.desktop {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .pagination {
