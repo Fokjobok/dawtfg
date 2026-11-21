@@ -1,5 +1,13 @@
 # Autenticación SPA y roles
 
+## Privacidad del perfil
+
+GET/HEAD `/api/v1/profiles/{user}` permite visitantes y sesión web opcional, incluso sin Origin. Nombre, avatar y nivel numérico general siempre públicos; el propietario conserva su biografía y ajustes. Para terceros, bio solo se incluye si is_private=false y bio_is_private=false; de lo contrario se omite, también ante otro Administrator. La preferencia bio_is_private solo se devuelve al propietario. Nunca devuelve correo, rol, credenciales ni rutas de almacenamiento. Bearer no identifica al propietario en esta consulta; la SPA utiliza cookies. Cache-Control es no-store/private.
+
+GET/HEAD `/api/v1/profile` exige sesión y devuelve el perfil propio. PATCH `/api/v1/profile` exige sesión y CSRF, también sin Origin; multipart utiliza POST con _method=PATCH. Todos los roles pueden editar su nombre, biografía, privacidad general y de biografía, y avatar, sin cambiar nivel, experiencia, rangos, correo, rol, contraseña o especialidades. Alternar la privacidad general no borra la preferencia por sección. Las reglas administrativas de `/users` permanecen independientes. La privacidad del perfil no sustituye los permisos de cursos o administración.
+
+## Sesión y roles
+
 Sanctum 4.4.0 usa el guard de sesión `web` y cookies. React y Laravel se comunican a través del mismo origen de Nginx. El registro público crea siempre Student. Las contraseñas se guardan mediante el cast de hashing de Laravel. El registro exige al menos 12 caracteres; tanto registro como login rechazan bytes nulos y más de 72 bytes, el límite de bcrypt. Se responde 422 con error de campo, sin truncar entradas en el servidor. [Contrato OpenAPI](../backend/openapi.json)
 
 En el entorno de desarrollo, abre [Mi cuenta](http://localhost:8080/account). La pantalla permite registrarse, iniciar sesión, consultar nombre, correo y rol, comprobar la sesión y cerrarla. Las credenciales enviadas por el formulario se usan para autenticar la petición. El identificador de sesión permanece en la cookie HttpOnly.
@@ -15,7 +23,7 @@ El login y el registro regeneran el identificador de sesión. Laravel 13 acepta 
 
 ## Sesión y respuestas
 
-GET/HEAD `/api/v1/session` permite consultar opcionalmente la sesión al entrar en la SPA: devuelve 200 con `{"data":null}` para un visitante o `data` con la identidad propia cuando existe sesión web válida. Solo expone id, nombre, correo y rol del usuario de la cookie; no permite elegir otra cuenta ni autenticar mediante Bearer. Usa el grupo web para resolver la sesión incluso sin Origin y siempre envía `Cache-Control: no-store, private`. HEAD no tiene cuerpo. Esto permite consultar si se ha iniciado sesión sin provocar un 401 esperado en la consola del navegador.
+GET/HEAD `/api/v1/session` permite consultar opcionalmente la sesión al entrar en la SPA: devuelve 200 con `{"data":null}` para un visitante o `data` con la identidad propia cuando existe sesión web válida. Solo expone id, nombre, correo, rol y avatar_url nullable del usuario de la cookie; no permite elegir otra cuenta ni autenticar mediante Bearer. avatar_url utiliza la misma URL pública/versionada del perfil y no expone la ruta interna o la biografía. UserResource también la devuelve en login, registro y GET user. Usa el grupo web para resolver la sesión incluso sin Origin y siempre envía `Cache-Control: no-store, private`. HEAD no tiene cuerpo. Esto permite consultar si se ha iniciado sesión sin provocar un 401 esperado en la consola del navegador.
 
 GET `/api/v1/user` sigue siendo una consulta protegida y devuelve 401 sin sesión. Las demás rutas privadas conservan 401/403 y sus Policies. En React, `getSession()` consulta `/session`; `RequireRole` comprueba sesión y rol antes de montar administración o creación de cursos. Administración requiere Administrator y la creación admite Coach o Administrator. El catálogo de cursos es público. Estas comprobaciones de interfaz no sustituyen la autorización del backend.
 

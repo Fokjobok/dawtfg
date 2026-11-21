@@ -38,6 +38,12 @@ class CoursePolicy
             || ($actor->role === UserRole::Coach && (int) $course->coach_id === $actor->id);
     }
 
+    public function delete(User $actor, Course $course): bool
+    {
+        return $actor->role === UserRole::Administrator
+            || ($actor->role === UserRole::Coach && (int) $course->coach_id === $actor->id);
+    }
+
     public function viewCover(?User $actor, Course $course): bool
     {
         if (Course::publiclyVisible()->whereKey($course->id)->exists()) {

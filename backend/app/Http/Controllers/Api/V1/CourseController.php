@@ -12,9 +12,11 @@ use App\Http\Resources\ManagedCourseResource;
 use App\Http\Resources\PublicCourseResource;
 use App\Models\Course;
 use App\Services\CourseCreationService;
+use App\Services\CourseDeletionService;
 use App\Services\CourseUpdateService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -65,6 +67,14 @@ class CourseController extends Controller
     {
         return (new ManagedCourseResource($courses->update($request->user(), $course, $request->validated())))
             ->response()->header('Cache-Control', 'no-store, private');
+    }
+
+    public function destroy(Request $request, Course $course, CourseDeletionService $courses): Response
+    {
+        Gate::authorize('delete', $course);
+        $courses->delete($request->user(), $course);
+
+        return response()->noContent()->header('Cache-Control', 'no-store, private');
     }
 
     public function cover(Request $request, Course $course): StreamedResponse

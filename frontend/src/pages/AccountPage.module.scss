@@ -84,3 +84,33 @@
     flex: 1 1 auto;
   }
 }
+
+.profileHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.avatar,
+.avatarPlaceholder {
+  width: clamp(4rem, 12vw, 8rem);
+  height: clamp(4rem, 12vw, 8rem);
+  flex-shrink: 0;
+}
+
+.avatar {
+  object-fit: cover;
+}
+
+.avatarPlaceholder {
+  display: grid;
+  place-items: center;
+  background: var(--color-surface-raised);
+}
+
+.actions > a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+}

@@ -4,6 +4,7 @@ import FormField from '../components/FormField.jsx'
 import { ApiError } from '../services/api.js'
 import { getSession, login, logout, register } from '../services/auth.js'
 import styles from './AccountPage.module.scss'
+import { Link } from 'react-router'
 
 export default function AccountPage() {
   const [user, setUser] = useState(null)
@@ -88,24 +89,6 @@ export default function AccountPage() {
     }
   }
 
-  async function refreshSession() {
-    setPending(true)
-    try {
-      const session = await getSession()
-      setUser(session)
-      if (!session) setMode('login')
-      setMessage(
-        session
-          ? 'La sesión sigue activa.'
-          : 'La sesión ha caducado. Inicia sesión de nuevo.',
-      )
-    } catch (error) {
-      showError(error)
-    } finally {
-      setPending(false)
-    }
-  }
-
   if (loading) return <p role="status">Consultando la sesión…</p>
 
   return (
@@ -130,7 +113,22 @@ export default function AccountPage() {
         )}
         {user ? (
           <>
-            <h2>Sesión iniciada</h2>
+            <div className={styles.profileHeader}>
+              <h2>Mi perfil</h2>
+
+              {user.avatar_url ? (
+                <img
+                  className={styles.avatar}
+                  src={user.avatar_url}
+                  alt={`Avatar de ${user.name}`}
+                  width={128}
+                  height={128}
+                  decoding="async"
+                />
+              ) : (
+                <span className={styles.avatarPlaceholder}>Sin avatar</span>
+              )}
+            </div>
             <dl className={styles.identity}>
               <div>
                 <dt>Nombre</dt>
@@ -145,14 +143,16 @@ export default function AccountPage() {
                 <dd>{user.role}</dd>
               </div>
             </dl>
+
             <div className={styles.actions}>
-              <Button
-                variant="secondary"
-                disabled={pending}
-                onClick={refreshSession}
-              >
-                Comprobar sesión
-              </Button>
+              <Link to={`/profiles/${user.id}`}>Editar perfil</Link>
+
+              {['Coach', 'Administrator'].includes(user.role) && (
+                <Link to="/courses/manage">Gestionar cursos</Link>
+              )}
+            </div>
+
+            <div className={styles.actions}>
               <Button disabled={pending} onClick={endSession}>
                 Cerrar sesión
               </Button>

@@ -1456,7 +1456,7 @@
         ],
         "operationId": "updateCourse",
         "summary": "Editar un curso existente",
-        "description": "Responsable, colaboradores y Administrator editan título, descripción, nivel, precio, estado, portada, especialidad y colaboradores. Un colaborador no puede sustituir al responsable. Coach elige una especialidad propia y todos los docentes deben pertenecer a ella. JSON usa PATCH; multipart usa POST a esta URI con _method=PATCH y CSRF. Se acepta [] en JSON o cadena JSON [] en multipart para vaciar colaboradores, conservando el responsable. Omitir cover lo conserva; remove_cover=true lo elimina. No existe DELETE de cursos.",
+        "description": "Responsable, colaboradores y Administrator editan título, descripción, nivel, precio, estado, portada, especialidad y colaboradores. Un colaborador no puede sustituir al responsable. Coach elige una especialidad propia y todos los docentes deben pertenecer a ella. JSON usa PATCH; multipart usa POST a esta URI con _method=PATCH y CSRF. Se acepta [] en JSON o cadena JSON [] en multipart para vaciar colaboradores, conservando el responsable. Omitir cover lo conserva; remove_cover=true lo elimina. El borrado usa DELETE por separado y queda reservado al responsable o Administrator.",
         "security": [
           {
             "sessionCookie": []
@@ -1541,6 +1541,65 @@
           },
           "422": {
             "$ref": "#/components/responses/ValidationError"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Cursos"
+        ],
+        "operationId": "deleteCourse",
+        "summary": "Borrar un curso",
+        "description": "Borrado definitivo solo por el responsable actual o cualquier Administrator, con sesión y CSRF. Un colaborador conserva edición, pero recibe 403 al intentar borrar. Se revalida el rol y responsable actuales bajo bloqueo. Se eliminan el curso y sus asociaciones secundarias; usuarios y especialidades se conservan. La portada se limpia después de confirmar la transacción; un fallo de limpieza se registra sin convertir el borrado confirmado en error. No hay borrado masivo ni resecuenciación de identificadores.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "course",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "X-XSRF-TOKEN",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Token URL-decodificado de la cookie; Swagger lo prepara automáticamente."
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Curso borrado; sin cuerpo, Cache-Control no-store/private."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "description": "Curso inexistente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "419": {
+            "$ref": "#/components/responses/SessionExpired"
           },
           "500": {
             "$ref": "#/components/responses/ServerError"
@@ -1657,6 +1716,337 @@
           }
         }
       }
+    },
+    "/api/v1/profiles/{user}": {
+      "get": {
+        "operationId": "getPublicProfile",
+        "tags": [
+          "Perfiles"
+        ],
+        "summary": "Consulta un perfil público y su privacidad",
+        "description": "Sesión web opcional, también sin Origin. Nunca expone correo, rol, credenciales ni rutas internas. Bearer no identifica al propietario. HEAD conserva estado y cabeceras sin cuerpo.",
+        "security": [
+          {},
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Nombre, avatar y nivel general siempre públicos. El modo privado general oculta la biografía a otros usuarios. En modo público, la biografía también se omite si su sección es privada. El propietario siempre ve todo y sus ajustes. Cache-Control: no-store, private.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicProfileResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/UserNotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      },
+      "head": {
+        "operationId": "headPublicProfile",
+        "tags": [
+          "Perfiles"
+        ],
+        "summary": "Consulta un perfil público y su privacidad",
+        "description": "Sesión web opcional, también sin Origin. Nunca expone correo, rol, credenciales ni rutas internas. Bearer no identifica al propietario. HEAD conserva estado y cabeceras sin cuerpo.",
+        "security": [
+          {},
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Nombre, avatar y nivel general siempre públicos. El modo privado general oculta la biografía a otros usuarios. En modo público, la biografía también se omite si su sección es privada. El propietario siempre ve todo y sus ajustes. Cache-Control: no-store, private.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicProfileResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/UserNotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/v1/profile": {
+      "get": {
+        "operationId": "getOwnProfile",
+        "tags": [
+          "Perfiles"
+        ],
+        "summary": "Consulta el perfil propio",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Perfil propio completo. Cache-Control: no-store, private. HEAD sin cuerpo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnProfileResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      },
+      "head": {
+        "operationId": "headOwnProfile",
+        "tags": [
+          "Perfiles"
+        ],
+        "summary": "Consulta el perfil propio",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Perfil propio completo. Cache-Control: no-store, private. HEAD sin cuerpo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnProfileResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      },
+      "patch": {
+        "operationId": "updateOwnProfile",
+        "tags": [
+          "Perfiles"
+        ],
+        "summary": "Edita el perfil propio con sesión y CSRF",
+        "description": "Cualquier rol edita solo su perfil. Para archivo se envía POST multipart a esta misma URL con _method=PATCH. Sustituir o retirar avatar limpia el anterior tras confirmar la transacción. Un fallo posterior de limpieza se registra sin falsear el guardado.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-XSRF-TOKEN",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Token URL-decodificado de la cookie; Swagger lo prepara automáticamente."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProfileInput"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProfileMultipartInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Perfil propio actualizado. Nombre, avatar y nivel general siguen públicos. Las preferencias por sección se conservan al cambiar el modo global. Cache-Control: no-store, private.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnProfileResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "419": {
+            "$ref": "#/components/responses/SessionExpired"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/v1/profiles/{user}/avatar": {
+      "get": {
+        "operationId": "getProfileAvatar",
+        "tags": [
+          "Perfiles"
+        ],
+        "summary": "Obtiene el avatar público de un usuario",
+        "security": [],
+        "parameters": [
+          {
+            "name": "user",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Avatar siempre público. Cache-Control: no-store, private; X-Content-Type-Options: nosniff; Content-Security-Policy restrictiva; inline. HEAD sin cuerpo.",
+            "content": {
+              "image/jpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/webp": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Usuario o avatar inexistente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      },
+      "head": {
+        "operationId": "headProfileAvatar",
+        "tags": [
+          "Perfiles"
+        ],
+        "summary": "Obtiene el avatar público de un usuario",
+        "security": [],
+        "parameters": [
+          {
+            "name": "user",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Avatar siempre público. Cache-Control: no-store, private; X-Content-Type-Options: nosniff; Content-Security-Policy restrictiva; inline. HEAD sin cuerpo.",
+            "content": {
+              "image/jpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/webp": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Usuario o avatar inexistente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1695,7 +2085,8 @@
           "id",
           "name",
           "email",
-          "role"
+          "role",
+          "avatar_url"
         ],
         "additionalProperties": false,
         "properties": {
@@ -1716,6 +2107,13 @@
               "Coach",
               "Student"
             ]
+          },
+          "avatar_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "URL pública del avatar, incluso con perfil privado; null si no existe. Incluye una versión al reemplazarlo."
           }
         }
       },
@@ -2537,7 +2935,8 @@
           "level",
           "coach",
           "specialty",
-          "can_change_responsible"
+          "can_change_responsible",
+          "can_delete"
         ],
         "additionalProperties": false,
         "properties": {
@@ -2638,6 +3037,10 @@
           "can_change_responsible": {
             "type": "boolean",
             "description": "true para Administrator o el responsable actual; el servidor verifica siempre el permiso."
+          },
+          "can_delete": {
+            "type": "boolean",
+            "description": "true solo para Administrator o el Coach responsable actual. Un colaborador no puede borrar el curso; el servidor verifica siempre el permiso."
           }
         }
       },
@@ -2874,6 +3277,225 @@
           }
         },
         "minProperties": 2,
+        "required": [
+          "_method"
+        ]
+      },
+      "PublicProfile": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name",
+          "avatar_url",
+          "is_private",
+          "can_edit",
+          "level"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "avatar_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "URL pública del avatar, incluso con perfil privado; null si no existe. Incluye una versión al reemplazarlo."
+          },
+          "is_private": {
+            "type": "boolean"
+          },
+          "can_edit": {
+            "type": "boolean",
+            "description": "Solo true para el propietario identificado por su sesión web."
+          },
+          "bio": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 2000,
+            "description": "Solo presente para el propietario, o si el perfil es público y bio_is_private=false. Se omite completamente en los demás casos, también para otro Administrator."
+          },
+          "level": {
+            "type": "integer",
+            "minimum": 1,
+            "readOnly": true,
+            "description": "Nivel numérico general siempre público, inicial 1. Sin experiencia ni subidas automáticas en esta entrega; independiente del nivel de cursos y de futuros rangos por materia."
+          },
+          "bio_is_private": {
+            "type": "boolean",
+            "description": "Preferencia de la sección biografía, solo presente para el propietario. Se conserva al activar o desactivar el modo privado general."
+          }
+        }
+      },
+      "OwnProfile": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name",
+          "avatar_url",
+          "is_private",
+          "can_edit",
+          "bio",
+          "level",
+          "bio_is_private"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "avatar_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "URL pública del avatar, incluso con perfil privado; null si no existe. Incluye una versión al reemplazarlo."
+          },
+          "is_private": {
+            "type": "boolean"
+          },
+          "can_edit": {
+            "type": "boolean",
+            "const": true
+          },
+          "bio": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 2000,
+            "description": "Solo presente para el propietario, o si el perfil es público y bio_is_private=false. Se omite completamente en los demás casos, también para otro Administrator."
+          },
+          "level": {
+            "type": "integer",
+            "minimum": 1,
+            "readOnly": true,
+            "description": "Nivel numérico general siempre público, inicial 1. Sin experiencia ni subidas automáticas en esta entrega; independiente del nivel de cursos y de futuros rangos por materia."
+          },
+          "bio_is_private": {
+            "type": "boolean",
+            "description": "Preferencia de la sección biografía, solo presente para el propietario. Se conserva al activar o desactivar el modo privado general."
+          }
+        }
+      },
+      "PublicProfileResponse": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PublicProfile"
+          }
+        }
+      },
+      "OwnProfileResponse": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/OwnProfile"
+          }
+        }
+      },
+      "UpdateProfileInput": {
+        "type": "object",
+        "minProperties": 1,
+        "additionalProperties": false,
+        "description": "Edición parcial del perfil propio y de la privacidad de la biografía. No permite cambiar nivel, experiencia, rangos por materia, rol, correo, credenciales, identificadores, especialidades o rutas internas.",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "bio": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 2000
+          },
+          "is_private": {
+            "type": "boolean"
+          },
+          "remove_avatar": {
+            "type": "boolean"
+          },
+          "bio_is_private": {
+            "type": "boolean"
+          }
+        }
+      },
+      "UpdateProfileMultipartInput": {
+        "type": "object",
+        "minProperties": 2,
+        "additionalProperties": false,
+        "description": "Edición parcial del perfil propio y de la privacidad de la biografía. No permite cambiar nivel, experiencia, rangos por materia, rol, correo, credenciales, identificadores, especialidades o rutas internas.",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "bio": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 2000
+          },
+          "is_private": {
+            "type": "integer",
+            "enum": [
+              0,
+              1
+            ],
+            "description": "En multipart enviar 0 o 1; JSON usa booleanos."
+          },
+          "remove_avatar": {
+            "type": "integer",
+            "enum": [
+              0,
+              1
+            ],
+            "description": "En multipart enviar 0 o 1; JSON usa booleanos."
+          },
+          "_method": {
+            "type": "string",
+            "const": "PATCH"
+          },
+          "avatar": {
+            "type": "string",
+            "format": "binary",
+            "description": "JPG, PNG o WebP; hasta 2048 KiB, ancho máximo 1024 y alto máximo 1024, independientes. No combinar archivo con remove_avatar=1."
+          },
+          "bio_is_private": {
+            "type": "integer",
+            "enum": [
+              0,
+              1
+            ],
+            "description": "En multipart enviar 0 o 1; JSON usa booleanos."
+          }
+        },
         "required": [
           "_method"
         ]

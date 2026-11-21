@@ -21,4 +21,15 @@ class UserPolicy
     {
         return $actor->is($user) || $actor->role === UserRole::Administrator;
     }
+
+    public function updateProfile(User $actor, User $user): bool
+    {
+        return $actor->is($user);
+    }
+
+    public function viewProfileBio(?User $actor, User $user): bool
+    {
+        return ($actor !== null && $actor->is($user))
+            || (! $user->is_private && ! $user->bio_is_private);
+    }
 }

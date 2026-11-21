@@ -1,0 +1,11 @@
+.avatar {
+  display: block;
+  width: 8rem;
+  height: 8rem;
+  object-fit: cover;
+}
+
+.bio {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

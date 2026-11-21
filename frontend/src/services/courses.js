@@ -75,3 +75,15 @@ export async function updateCourse(courseId, details) {
 
   return response.data
 }
+
+export async function getManagedCourses(page = 1) {
+  return apiRequest(`/teaching/courses?page=${page}&per_page=12`)
+}
+
+export async function deleteCourse(courseId) {
+  await prepareCsrf()
+
+  return apiRequest(`/courses/${encodeURIComponent(courseId)}`, {
+    method: 'DELETE',
+  })
+}

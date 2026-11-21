@@ -27,7 +27,9 @@ export default function CourseCard({ course }) {
       </div>
 
       <div className={styles.content}>
-        <p>{course.specialty.name}</p>
+        <p>
+          Curso #{course.id} - {course.specialty.name}
+        </p>
 
         <h2 id={`course-${course.id}-title`}>{course.title}</h2>
 

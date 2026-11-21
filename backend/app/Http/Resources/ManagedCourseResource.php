@@ -13,6 +13,7 @@ class ManagedCourseResource extends CourseResource
             'coach' => $this->coach ? new CoachResource($this->coach) : null,
             'specialty' => $this->specialty ? new SpecialtyResource($this->specialty) : null,
             'can_change_responsible' => $request->user()->can('changeResponsible', $this->resource),
+            'can_delete' => $request->user()->can('delete', $this->resource),
         ];
     }
 }

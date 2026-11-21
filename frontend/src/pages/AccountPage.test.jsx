@@ -1,6 +1,15 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
+import { MemoryRouter } from 'react-router'
 import AccountPage from './AccountPage.jsx'
+
+function renderAccount() {
+  return render(
+    <MemoryRouter>
+      <AccountPage />
+    </MemoryRouter>,
+  )
+}
 
 const user = {
   id: 1,
@@ -24,7 +33,7 @@ it('logs in using the CSRF cookie and displays the current identity', async () =
     .mockResolvedValueOnce(Response.json({ data: user }))
   vi.stubGlobal('fetch', request)
   document.cookie = 'XSRF-TOKEN=csrf-test-token'
-  render(<AccountPage />)
+  renderAccount()
 
   await screen.findByRole('button', { name: 'Entrar' })
   fireEvent.change(screen.getByLabelText('Correo electrónico'), {
@@ -73,7 +82,7 @@ it('shows field validation errors during registration', async () => {
       ),
     )
   vi.stubGlobal('fetch', request)
-  render(<AccountPage />)
+  renderAccount()
 
   fireEvent.click(
     await screen.findByRole('button', { name: 'Crear cuenta de estudiante' }),
@@ -106,13 +115,12 @@ it('returns to the login form when a session has expired', async () => {
     vi
       .fn()
       .mockResolvedValueOnce(Response.json({ data: user }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
       .mockResolvedValueOnce(anonymous()),
   )
-  render(<AccountPage />)
+  renderAccount()
 
-  fireEvent.click(
-    await screen.findByRole('button', { name: 'Comprobar sesión' }),
-  )
+  fireEvent.click(await screen.findByRole('button', { name: 'Cerrar sesión' }))
   await screen.findByText('La sesión ha caducado. Inicia sesión de nuevo.')
   expect(screen.getByRole('button', { name: 'Entrar' })).toBeDefined()
 })
@@ -126,7 +134,7 @@ it('clears the displayed identity after logout', async () => {
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
       .mockResolvedValueOnce(new Response(null, { status: 204 })),
   )
-  render(<AccountPage />)
+  renderAccount()
 
   fireEvent.click(await screen.findByRole('button', { name: 'Cerrar sesión' }))
   await screen.findByText('Sesión cerrada.')

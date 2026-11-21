@@ -20,6 +20,9 @@ class UserResource extends JsonResource
             'name' => $this->name,
             'email' => $this->email,
             'role' => $this->role->value,
+            'avatar_url' => $this->avatar_path
+                ? route('api.v1.profiles.avatar', ['user' => $this->id], false).'?v='.substr(hash('sha256', $this->avatar_path), 0, 16)
+                : null,
         ];
     }
 }

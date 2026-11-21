@@ -14,6 +14,7 @@ El modelo organiza los cursos por especialidad y relaciona cada Coach con las ma
 
 | Campo | Tipo y valor inicial | Responsabilidad |
 | --- | --- | --- |
+| `id` | Clave primaria existente | Número estable compartido por catálogo y gestión; no se renumera tras borrar |
 | `coach_id` | FK nullable a `users.id` | Coach responsable; no es necesariamente quien pulsa crear |
 | `specialty_id` | FK nullable a `specialties.id` | Asignatura o videojuego del curso; sustituye `category_id` |
 | `status` | `draft` por defecto; admite `draft` o `published` | Separar preparación y publicación |
@@ -78,13 +79,13 @@ La transacción de creación bloquea las filas del creador, el responsable y los
 
 ### Consulta y edición privadas
 
-GET/HEAD `/api/v1/teaching/courses` lista los cursos del Coach como responsable o colaborador; Administrator consulta todos, incluidos borradores. GET/HEAD `/api/v1/courses/{course}` devuelve un curso editable. ManagedCourseResource añade responsable/especialidad con id/nombre (null si faltan en una fila heredada) y can_change_responsible. No expone correos ni rutas de disco. Las respuestas son privadas y no almacenables; Student, visitantes y Coaches no participantes no obtienen estos datos.
+GET/HEAD `/api/v1/teaching/courses` lista los cursos del Coach como responsable o colaborador; Administrator consulta todos, incluidos borradores. GET/HEAD `/api/v1/courses/{course}` devuelve un curso editable. ManagedCourseResource añade responsable/especialidad con id/nombre (null si faltan en una fila heredada) y las capacidades can_change_responsible/can_delete. No expone correos ni rutas de disco. Las respuestas son privadas y no almacenables; Student, visitantes y Coaches no participantes no obtienen estos datos.
 
 PATCH `/api/v1/courses/{course}` requiere sesión y CSRF. Responsable, colaboradores y cualquier Administrator pueden cambiar título, descripción, nivel, precio, estado, especialidad, colaboradores y portada. La identidad protegida es el responsable actual; no se conserva otra cuenta de creador histórico. Un colaborador no puede sustituir al responsable; solo el responsable actual o Administrator pueden hacerlo. El responsable permanece separado de additional_coach_ids y vaciar esa lista no lo elimina. Un colaborador puede quitarse a sí mismo, tras lo que pierde acceso privado si no tiene otro permiso.
 
 El editor Coach debe pertenecer a la especialidad de destino. El responsable y todos los colaboradores resultantes deben ser Coaches asignados a ella; el cambio de materia no altera automáticamente el equipo. Omitir una propiedad conserva su valor. Cuando se incluyen level, coach_id o specialty_id, no se admiten nulos o vacíos. Administrator puede corregir asignaciones heredadas incompletas enviando un equipo válido.
 
-CourseUpdateService bloquea por id ascendente a editor y docentes anteriores/nuevos antes de bloquear el curso. Revalida autorización, roles y pertenencia con los registros actuales. Si el equipo cambia entre la lectura inicial y el bloqueo, responde 409 para recargar; no añade bloqueo optimista de todos los campos ni promete detectar una edición previa de texto. No hay endpoint DELETE de cursos, lecciones, inscripciones o cobros.
+CourseUpdateService bloquea por id ascendente a editor y docentes anteriores/nuevos antes de bloquear el curso. Revalida autorización, roles y pertenencia con los registros actuales. Si el equipo cambia entre la lectura inicial y el bloqueo, responde 409 para recargar; no añade bloqueo optimista de todos los campos ni promete detectar una edición previa de texto. El borrado de cursos tiene una autorización independiente; lecciones, inscripciones y cobros siguen pendientes.
 
 ### Almacenamiento de la portada
 
@@ -98,7 +99,7 @@ GET/HEAD `/api/v1/courses/{course}/cover` permite lectura sin sesión cuando el 
 
 El archivo y la base de datos no comparten transacción: si falla la inserción tras almacenar la portada, se revierte la base y se elimina el archivo en el manejo de error. Un fallo excepcional de limpieza se registra para revisión, sin ocultar el error original. Una caída abrupta del proceso durante esa ventana aún puede dejar un archivo huérfano; no se afirma atomicidad distribuida. Los límites actuales del runtime comprobado son upload_max_filesize=2M, post_max_size=8M y Nginx 10m; los rechazos de infraestructura pueden ocurrir antes de la validación Laravel y no equivalen al error de campo 422.
 
-Regla acordada para la futura fase de lecciones: el Coach secundario no podrá eliminar el curso y podrá eliminar sus propias lecciones y materiales. No hay todavía endpoints de borrado de cursos, lecciones o materiales; esta decisión no acredita permisos de borrado implementados. No implica poder editar o borrar contenido ajeno ni retirarse del curso.
+El Coach secundario no puede eliminar el curso. Para la futura fase de lecciones se mantiene la regla de poder eliminar solo sus propias lecciones y materiales. No hay todavía endpoints de lecciones o materiales y esta decisión no acredita esos permisos futuros implementados ni permite borrar contenido ajeno.
 
 En React se elige primero una especialidad, después su responsable y los colaboradores opcionales; al cambiar de especialidad se descartan las selecciones anteriores. Gratuito/de pago es un control de interfaz: el envío se normaliza a price=0 para gratuito y a un importe positivo para de pago. No se añade otro indicador de gratuidad a la base de datos. El formulario exige elegir un nivel y permite seleccionar el estado inicial y una portada opcional; envía FormData sin fijar Content-Type para que el navegador genere el boundary y muestra los errores por campo. La API conserva la posibilidad de omitir level para clientes anteriores. Tras guardar, se reinicia el formulario y se confirma el estado devuelto por el servidor.
 
@@ -139,3 +140,23 @@ docker compose --env-file .env -p dawtfg -f compose.yaml -f compose.heidi.yaml e
 ```
 
 Las pruebas de esquema se ejecutan en bases aisladas; no revertir migraciones sobre datos de desarrollo para comprobarlas. El esquema no equivale a un flujo completo de creación de cursos.
+
+### Perfil del usuario
+
+La migración `2026_11_21_000001_add_profile_fields_to_users_table.php` amplía users sin otra tabla: bio text nullable, is_private boolean default false y avatar_path string nullable. Conserva nombre, correo, rol, contraseña y relaciones. Su reversión retira únicamente esos tres campos. Los perfiles existentes quedan públicos sin avatar ni biografía; no se inventan inscripciones o estadísticas.
+
+La migración posterior `2026_11_21_000002_add_level_and_bio_privacy_to_users_table.php` añade level integer default 1 y bio_is_private boolean default false, sin cambiar biografía, privacidad general, avatar o credenciales anteriores. No se reescribe la primera migración ya aplicada. Su reversión retira únicamente esos dos campos.
+
+ProfileResource devuelve id, name, level, avatar_url, is_private, can_edit y bio cuando puede consultarse; bio_is_private solo al propietario. Nombre, avatar y nivel general siempre públicos. Para terceros, bio se omite completamente si is_private=true o bio_is_private=true. Solo el propietario consulta todos sus datos o edita el perfil, con cualquier rol; otro Administrator no tiene excepción en esta API. Cambiar el modo general conserva la preferencia de la sección. avatar_path, bio y bio_is_private quedan ocultos en la serialización genérica del modelo; el recurso aplica expresamente la política. No se amplía la asignación masiva de User.
+
+El nivel general comienza en 1 y solo se consulta desde esta API; no se calculan experiencia o ascensos. Se distingue del nivel de cursos y de los rangos por materia (principiante/avanzado/experto), cuyo mecanismo de obtención y asignación queda pendiente. No se crean tablas vacías de rangos, amistad, logros o inscripciones; cada sección añadirá su ajuste al existir, sometido siempre a la privacidad global.
+
+ProfileUpdateService bloquea el usuario y actualiza exclusivamente los campos autorizados. Avatar opcional JPG/PNG/WebP, 2048 KiB y máximos independientes 1024×1024; archivo con nombre generado en disco local privado, servido públicamente solo por profiles/{user}/avatar, incluso con perfil privado. La URL incluye una versión al reemplazarlo. Se conserva el anterior si falla la base, limpiando el reemplazo; se retira el anterior después del guardado confirmado. Los fallos de limpieza se registran, pudiendo dejar archivos huérfanos; no existe atomicidad distribuida entre base y disco. Sin recorte, redimensionado automático ni dependencias adicionales.
+
+### Borrado de cursos
+
+DELETE courses/{course} está reservado al responsable actual y a Administrator, con sesión y CSRF. El permiso de edición de colaboradores no permite borrar. CourseDeletionService bloquea los usuarios pertinentes por id y después el curso, vuelve a comprobar el rol y responsable actuales y elimina la fila dentro de una transacción. course_coach se limpia mediante su FK cascade; usuarios y especialidades se conservan. No se añade soft delete ni otra migración.
+
+La portada se retira después de confirmar el borrado. Un fallo de base conserva fila, equipo y archivo; un fallo de limpieza posterior se registra y puede dejar un archivo privado huérfano, sin fingir que el curso sigue existiendo. La operación devuelve 204 sin cuerpo; el identificador eliminado no provoca resecuenciación de otros cursos. No se promete atomicidad con el disco o con una transacción externa que envolviera el servicio.
+
+El número mostrado por las interfaces utiliza el id existente, compartido por PublicCourseResource y ManagedCourseResource. can_delete se expone solo en la representación privada y se obtiene de la Policy; no hay que deducirlo del rol guardado en el navegador o del permiso de cambio de responsable. cover_url ya está disponible en ambas representaciones para mostrar miniaturas con un tamaño CSS limitado, conservando los archivos originales.

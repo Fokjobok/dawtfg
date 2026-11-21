@@ -130,7 +130,7 @@ final class CourseEditingTest extends TestCase
         $this->patchJson($path, ['coach_id' => $f['stranger']->id, 'additional_coach_ids' => [$f['owner']->id]])
             ->assertUnprocessable()->assertJsonValidationErrors('coach_id');
         $this->assertDatabaseHas('courses', ['id' => $f['course']->id, 'coach_id' => $f['owner']->id, 'title' => 'Updated']);
-        $this->deleteJson($path)->assertStatus(405);
+        $this->deleteJson($path)->assertForbidden();
         $this->assertDatabaseCount('courses', 1);
     }
 

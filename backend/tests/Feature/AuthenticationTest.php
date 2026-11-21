@@ -168,7 +168,7 @@ final class AuthenticationTest extends TestCase
         $user = $this->createUser($role);
         $this->actingAs($user, 'web')->getJson('/api/v1/user')
             ->assertOk()
-            ->assertExactJson(['data' => ['id' => $user->id, 'name' => $user->name, 'email' => $user->email, 'role' => $role->value]]);
+            ->assertExactJson(['data' => ['id' => $user->id, 'name' => $user->name, 'email' => $user->email, 'role' => $role->value, 'avatar_url' => null]]);
 
         $other = new User;
         $other->id = $user->id + 1;

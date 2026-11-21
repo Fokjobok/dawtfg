@@ -38,7 +38,7 @@ final class SessionStatusTest extends TestCase
         $user = $this->user($role);
         $this->actingAs($user, 'web')->getJson('/api/v1/session')->assertOk()
             ->assertHeader('Cache-Control', 'no-store, private')
-            ->assertExactJson(['data' => ['id' => $user->id, 'name' => $user->name, 'email' => $user->email, 'role' => $role->value]]);
+            ->assertExactJson(['data' => ['id' => $user->id, 'name' => $user->name, 'email' => $user->email, 'role' => $role->value, 'avatar_url' => null]]);
     }
 
     public static function roles(): array
