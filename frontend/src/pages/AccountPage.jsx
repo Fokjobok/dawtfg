@@ -2,18 +2,25 @@ import { useEffect, useRef, useState } from 'react'
 import Button from '../components/Button.jsx'
 import FormField from '../components/FormField.jsx'
 import { ApiError } from '../services/api.js'
-import { getSession, login, logout, register } from '../services/auth.js'
+
+import { login, logout, register } from '../services/auth.js'
+import { useAuth } from '../context/AuthContext.jsx'
+
+import { Link, useNavigate } from 'react-router'
+
 import styles from './AccountPage.module.scss'
-import { Link } from 'react-router'
 
 export default function AccountPage() {
-  const [user, setUser] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const { user, setUser, status } = useAuth()
   const [pending, setPending] = useState(false)
   const [mode, setMode] = useState('login')
   const [message, setMessage] = useState('')
   const [errors, setErrors] = useState({})
   const formRef = useRef(null)
+
+  const navigate = useNavigate()
+  const [loggingOut, setLoggingOut] = useState(false)
+  const [logoutError, setLogoutError] = useState('')
 
   useEffect(() => {
     formRef.current?.querySelector('input')?.focus()
@@ -22,24 +29,6 @@ export default function AccountPage() {
   useEffect(() => {
     formRef.current?.querySelector('[aria-invalid="true"]')?.focus()
   }, [errors])
-
-  useEffect(() => {
-    let active = true
-    getSession()
-      .then((session) => {
-        if (active) setUser(session)
-      })
-      .catch(() => {
-        if (active)
-          setMessage('No se pudo consultar la sesión. Comprueba la conexión.')
-      })
-      .finally(() => {
-        if (active) setLoading(false)
-      })
-    return () => {
-      active = false
-    }
-  }, [])
 
   function showError(error) {
     setErrors(error instanceof ApiError ? error.errors : {})
@@ -75,21 +64,41 @@ export default function AccountPage() {
     }
   }
 
-  async function endSession() {
-    setPending(true)
-    setMessage('')
+  async function handleLogout() {
+    if (loggingOut) return
+
+    setLoggingOut(true)
+    setLogoutError('')
+
     try {
       await logout()
       setUser(null)
-      setMessage('Sesión cerrada.')
+      navigate('/account', { replace: true })
     } catch (error) {
-      showError(error)
+      if (error.status === 401) {
+        setUser(null)
+        navigate('/account', { replace: true })
+      } else {
+        setLogoutError(
+          'No se pudo confirmar el cierre de sesión. Inténtalo de nuevo.',
+        )
+      }
     } finally {
-      setPending(false)
+      setLoggingOut(false)
     }
   }
 
-  if (loading) return <p role="status">Consultando la sesión…</p>
+  if (status === 'loading') {
+    return <p role="status">Consultando la sesión…</p>
+  }
+
+  if (status === 'error') {
+    return (
+      <p role="alert">
+        No se pudo consultar la sesión. Recarga la página e inténtalo de nuevo.
+      </p>
+    )
+  }
 
   return (
     <section className={styles.grid} aria-labelledby="account-title">
@@ -153,10 +162,17 @@ export default function AccountPage() {
             </div>
 
             <div className={styles.actions}>
-              <Button disabled={pending} onClick={endSession}>
-                Cerrar sesión
+              <Button
+                variant="secondary"
+                onClick={handleLogout}
+                disabled={loggingOut}
+                aria-busy={loggingOut}
+              >
+                {loggingOut ? 'Cerrando…' : 'Cerrar sesión'}
               </Button>
             </div>
+
+            {logoutError && <p role="alert">{logoutError}</p>}
           </>
         ) : (
           <>

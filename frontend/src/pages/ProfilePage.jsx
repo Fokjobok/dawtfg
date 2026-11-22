@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'react-router'
 import { getPublicProfile } from '../services/profiles.js'
 
+import { useAuth } from '../context/AuthContext.jsx'
+
 import styles from './ProfilePage.module.scss'
 import EditProfileForm from '../components/EditProfileForm.jsx'
 
@@ -14,6 +16,21 @@ export default function ProfilePage() {
 function ProfileDetails({ userId }) {
   const [profile, setProfile] = useState(null)
   const [error, setError] = useState('')
+  const { setUser } = useAuth()
+
+  function handleProfileSaved(updated) {
+    setProfile(updated)
+
+    setUser((current) =>
+      current?.id === updated.id
+        ? {
+            ...current,
+            name: updated.name,
+            avatar_url: updated.avatar_url,
+          }
+        : current,
+    )
+  }
 
   useEffect(() => {
     let active = true
@@ -78,7 +95,7 @@ function ProfileDetails({ userId }) {
       )}
 
       {profile.can_edit && (
-        <EditProfileForm profile={profile} onSaved={setProfile} />
+        <EditProfileForm profile={profile} onSaved={handleProfileSaved} />
       )}
     </section>
   )

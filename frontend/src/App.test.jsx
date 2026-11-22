@@ -1,15 +1,31 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App.jsx'
+import { AuthProvider } from './context/AuthContext.jsx'
+import { getSession } from './services/auth.js'
+
+vi.mock('./services/auth.js', async (importOriginal) => ({
+  ...(await importOriginal()),
+  getSession: vi.fn(),
+}))
+
+beforeEach(() => {
+  getSession.mockReset()
+  getSession.mockResolvedValue(null)
+})
 
 afterEach(cleanup)
 
-function renderRoute(path = '/') {
-  render(
-    <MemoryRouter initialEntries={[path]}>
-      <App />
-    </MemoryRouter>,
+async function renderRoute(path = '/') {
+  await act(async () =>
+    render(
+      <MemoryRouter initialEntries={[path]}>
+        <AuthProvider>
+          <App />
+        </AuthProvider>
+      </MemoryRouter>,
+    ),
   )
 }
 
@@ -17,7 +33,7 @@ describe('App', () => {
   it('checks the API and reports a successful connection', async () => {
     const request = vi.fn().mockResolvedValue(Response.json({ status: 'ok' }))
     vi.stubGlobal('fetch', request)
-    renderRoute()
+    await renderRoute()
 
     const button = screen.getByRole('button', { name: 'Comprobar conexión' })
     fireEvent.click(button)
@@ -40,7 +56,7 @@ describe('App', () => {
       .mockResolvedValueOnce(new Response(null, { status: 503 }))
       .mockResolvedValueOnce(Response.json({ status: 'ok' }))
     vi.stubGlobal('fetch', request)
-    renderRoute()
+    await renderRoute()
 
     const button = screen.getByRole('button', { name: 'Comprobar conexión' })
     fireEvent.click(button)
@@ -52,8 +68,8 @@ describe('App', () => {
     expect(request).toHaveBeenCalledTimes(2)
   })
 
-  it('offers a way back from an unknown route', () => {
-    renderRoute('/pagina-inexistente')
+  it('offers a way back from an unknown route', async () => {
+    await renderRoute('/pagina-inexistente')
 
     expect(
       screen.getByRole('heading', { name: 'Página no encontrada' }),

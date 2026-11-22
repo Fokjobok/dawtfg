@@ -1,29 +1,8 @@
-import { useEffect, useState } from 'react'
 import { Navigate, Outlet } from 'react-router'
-import { getSession } from '../services/auth.js'
+import { useAuth } from '../context/AuthContext.jsx'
 
 export default function RequireRole({ role }) {
-  const [user, setUser] = useState(null)
-  const [status, setStatus] = useState('loading')
-
-  useEffect(() => {
-    let active = true
-
-    getSession()
-      .then((session) => {
-        if (!active) return
-
-        setUser(session)
-        setStatus('ready')
-      })
-      .catch(() => {
-        if (active) setStatus('error')
-      })
-
-    return () => {
-      active = false
-    }
-  }, [])
+  const { user, status } = useAuth()
 
   if (status === 'loading') {
     return <p role="status">Comprobando la sesión…</p>

@@ -2,11 +2,14 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router'
 import AccountPage from './AccountPage.jsx'
+import { AuthProvider } from '../context/AuthContext.jsx'
 
 function renderAccount() {
   return render(
     <MemoryRouter>
-      <AccountPage />
+      <AuthProvider>
+        <AccountPage />
+      </AuthProvider>
     </MemoryRouter>,
   )
 }
@@ -17,8 +20,6 @@ const user = {
   email: 'student@example.test',
   role: 'Student',
 }
-const anonymous = () =>
-  Response.json({ error: 'Unauthorized', code: 401 }, { status: 401 })
 
 afterEach(() => {
   cleanup()
@@ -28,7 +29,7 @@ afterEach(() => {
 it('logs in using the CSRF cookie and displays the current identity', async () => {
   const request = vi
     .fn()
-    .mockResolvedValueOnce(anonymous())
+    .mockResolvedValueOnce(Response.json({ data: null }))
     .mockResolvedValueOnce(new Response(null, { status: 204 }))
     .mockResolvedValueOnce(Response.json({ data: user }))
   vi.stubGlobal('fetch', request)
@@ -69,7 +70,7 @@ it('logs in using the CSRF cookie and displays the current identity', async () =
 it('shows field validation errors during registration', async () => {
   const request = vi
     .fn()
-    .mockResolvedValueOnce(anonymous())
+    .mockResolvedValueOnce(Response.json({ data: null }))
     .mockResolvedValueOnce(new Response(null, { status: 204 }))
     .mockResolvedValueOnce(
       Response.json(
@@ -109,34 +110,30 @@ it('shows field validation errors during registration', async () => {
   )
 })
 
-it('returns to the login form when a session has expired', async () => {
+it('shows own profile navigation and the account-panel logout button', async () => {
   vi.stubGlobal(
     'fetch',
-    vi
-      .fn()
-      .mockResolvedValueOnce(Response.json({ data: user }))
-      .mockResolvedValueOnce(new Response(null, { status: 204 }))
-      .mockResolvedValueOnce(anonymous()),
+    vi.fn().mockResolvedValue(Response.json({ data: user })),
   )
   renderAccount()
-
-  fireEvent.click(await screen.findByRole('button', { name: 'Cerrar sesión' }))
-  await screen.findByText('La sesión ha caducado. Inicia sesión de nuevo.')
-  expect(screen.getByRole('button', { name: 'Entrar' })).toBeDefined()
+  await screen.findByRole('heading', { name: 'Mi perfil' })
+  expect(
+    screen.getByRole('link', { name: 'Editar perfil' }).getAttribute('href'),
+  ).toBe('/profiles/1')
+  expect(screen.queryByRole('link', { name: 'Gestionar cursos' })).toBeNull()
+  expect(screen.getByRole('button', { name: 'Cerrar sesión' })).toBeTruthy()
 })
 
-it('clears the displayed identity after logout', async () => {
+it('reports session lookup errors without presenting a confirmed guest login', async () => {
   vi.stubGlobal(
     'fetch',
     vi
       .fn()
-      .mockResolvedValueOnce(Response.json({ data: user }))
-      .mockResolvedValueOnce(new Response(null, { status: 204 }))
-      .mockResolvedValueOnce(new Response(null, { status: 204 })),
+      .mockResolvedValue(
+        Response.json({ error: 'Unavailable', code: 503 }, { status: 503 }),
+      ),
   )
   renderAccount()
-
-  fireEvent.click(await screen.findByRole('button', { name: 'Cerrar sesión' }))
-  await screen.findByText('Sesión cerrada.')
-  expect(screen.queryByText(user.email)).toBeNull()
+  await screen.findByRole('alert')
+  expect(screen.queryByRole('button', { name: 'Entrar' })).toBeNull()
 })

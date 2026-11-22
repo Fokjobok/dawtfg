@@ -3,6 +3,10 @@ import { Link, MemoryRouter, Route, Routes } from 'react-router'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import ProfilePage from './ProfilePage.jsx'
 import { getPublicProfile, updateOwnProfile } from '../services/profiles.js'
+import { AuthProvider } from '../context/AuthContext.jsx'
+import { getSession } from '../services/auth.js'
+
+vi.mock('../services/auth.js', () => ({ getSession: vi.fn() }))
 
 vi.mock('../services/profiles.js', () => ({
   getPublicProfile: vi.fn(),
@@ -24,15 +28,20 @@ function profile(overrides = {}) {
 function openProfile() {
   return render(
     <MemoryRouter initialEntries={['/profiles/6']}>
-      <Link to="/profiles/8">Otro perfil</Link>
-      <Routes>
-        <Route path="profiles/:userId" element={<ProfilePage />} />
-      </Routes>
+      <AuthProvider>
+        <Link to="/profiles/8">Otro perfil</Link>
+        <Routes>
+          <Route path="profiles/:userId" element={<ProfilePage />} />
+        </Routes>
+      </AuthProvider>
     </MemoryRouter>,
   )
 }
 
-beforeEach(() => vi.resetAllMocks())
+beforeEach(() => {
+  vi.resetAllMocks()
+  getSession.mockResolvedValue(null)
+})
 afterEach(() => cleanup())
 
 it('announces loading while the profile is pending', () => {
@@ -86,7 +95,7 @@ it('lets owners see their private biography and the global privacy status', asyn
     }),
   )
   openProfile()
-  await screen.findByText('Owner-only biography.')
+  await screen.findByText('Owner-only biography.', { selector: 'p' })
   expect(screen.getByText('Tu perfil es privado.')).toBeTruthy()
   expect(screen.getByRole('heading', { name: 'Biografía' })).toBeTruthy()
 })
@@ -146,8 +155,11 @@ it('updates the profile heading after the owner saves a name', async () => {
   await screen.findByRole('heading', { name: 'Updated student' })
   expect(updateOwnProfile).toHaveBeenCalledExactlyOnceWith({
     name: 'Updated student',
+    bio: null,
+    is_private: false,
+    bio_is_private: false,
   })
-  expect(screen.getByText('Nombre actualizado.')).toBeTruthy()
+  expect(screen.getByText('Perfil actualizado correctamente.')).toBeTruthy()
 })
 
 it('keeps the current profile and entered name after a field validation error', async () => {
@@ -168,5 +180,75 @@ it('keeps the current profile and entered name after a field validation error', 
   expect(screen.getByRole('heading', { name: 'Public student' })).toBeTruthy()
   expect(screen.getByRole('button', { name: 'Guardar cambios' }).disabled).toBe(
     false,
+  )
+})
+
+it('retains the section preference when switching global privacy and saves boolean settings', async () => {
+  const own = profile({
+    can_edit: true,
+    bio: 'Biography.',
+    bio_is_private: true,
+  })
+  getPublicProfile.mockResolvedValue(own)
+  updateOwnProfile.mockResolvedValue({ ...own, is_private: true })
+  openProfile()
+  const visibility = await screen.findByLabelText('Visibilidad del perfil')
+  const section = screen.getByLabelText('Visibilidad de la biografía')
+  expect(section.value).toBe('private')
+  expect(section.disabled).toBe(false)
+  fireEvent.change(visibility, { target: { value: 'private' } })
+  expect(section.disabled).toBe(true)
+  expect(section.value).toBe('private')
+  fireEvent.change(visibility, { target: { value: 'public' } })
+  expect(section.disabled).toBe(false)
+  expect(section.value).toBe('private')
+  fireEvent.change(visibility, { target: { value: 'private' } })
+  fireEvent.submit(
+    screen.getByRole('button', { name: 'Guardar cambios' }).closest('form'),
+  )
+  await screen.findByText('Perfil actualizado correctamente.')
+  expect(updateOwnProfile).toHaveBeenCalledExactlyOnceWith({
+    name: own.name,
+    bio: 'Biography.',
+    is_private: true,
+    bio_is_private: true,
+  })
+  expect(screen.getByText('Tu perfil es privado.')).toBeTruthy()
+  expect(screen.getByRole('textbox', { name: 'Biografía' }).value).toBe(
+    'Biography.',
+  )
+})
+
+it('saves an edited biography with independent section privacy and updates the visible profile', async () => {
+  const own = profile({
+    can_edit: true,
+    bio: 'Previous biography.',
+    bio_is_private: false,
+  })
+  getPublicProfile.mockResolvedValue(own)
+  updateOwnProfile.mockResolvedValue({
+    ...own,
+    bio: 'Updated biography.',
+    bio_is_private: true,
+  })
+  openProfile()
+  const biography = await screen.findByRole('textbox', { name: 'Biografía' })
+  fireEvent.change(biography, { target: { value: 'Updated biography.' } })
+  fireEvent.change(screen.getByLabelText('Visibilidad de la biografía'), {
+    target: { value: 'private' },
+  })
+  fireEvent.submit(
+    screen.getByRole('button', { name: 'Guardar cambios' }).closest('form'),
+  )
+  await screen.findByText('Perfil actualizado correctamente.')
+  expect(updateOwnProfile).toHaveBeenCalledExactlyOnceWith({
+    name: own.name,
+    bio: 'Updated biography.',
+    is_private: false,
+    bio_is_private: true,
+  })
+  expect(screen.getByText('Updated biography.', { selector: 'p' })).toBeTruthy()
+  expect(screen.getByLabelText('Visibilidad de la biografía').value).toBe(
+    'private',
   )
 })
