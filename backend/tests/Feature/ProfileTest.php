@@ -44,7 +44,7 @@ final class ProfileTest extends TestCase
         $user = $this->user(profile: ['bio' => 'Public biography.']);
         $path = '/api/v1/profiles/'.$user->id;
         $this->getJson($path)->assertOk()->assertHeader('Cache-Control', 'no-store, private')->assertExactJson(['data' => [
-            'id' => $user->id, 'name' => $user->name, 'level' => 1, 'avatar_url' => null, 'is_private' => false, 'can_edit' => false, 'bio' => 'Public biography.',
+            'id' => $user->id, 'name' => $user->name, 'level' => 1, 'avatar_url' => null, 'is_private' => false, 'can_edit' => false, 'bio' => 'Public biography.', 'featured_courses' => [], 'medals' => [],
         ]]);
         $this->head($path)->assertOk()->assertContent('');
         $this->getJson('/api/v1/users')->assertUnauthorized();

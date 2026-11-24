@@ -21,4 +21,9 @@ class Specialty extends Model
     {
         return $this->hasMany(Course::class);
     }
+
+    public function medals(): HasMany
+    {
+        return $this->hasMany(Medal::class);
+    }
 }

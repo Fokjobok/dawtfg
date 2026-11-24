@@ -27,6 +27,10 @@ final class ProfilePrivacyTest extends TestCase
         $path = '/api/v1/profiles/'.$owner->id;
         $visible = ! $private && ! $bioPrivate;
         $expected = ['id' => $owner->id, 'name' => $owner->name, 'level' => 7, 'avatar_url' => null, 'is_private' => $private, 'can_edit' => false];
+        if (! $private) {
+            $expected['featured_courses'] = [];
+            $expected['medals'] = [];
+        }
         if ($visible) {
             $expected['bio'] = 'Biography.';
         }
@@ -59,6 +63,8 @@ final class ProfilePrivacyTest extends TestCase
             ->assertJsonPath('data.bio_is_private', true);
         $this->patchJson('/api/v1/profile', ['is_private' => false])->assertOk()->assertJsonPath('data.bio_is_private', true);
         $this->actingAs($visitor, 'web')->getJson($path)->assertOk()->assertJsonMissingPath('data.bio');
+        // Three effective saves have completed; the next block starts after the cooldown.
+        $this->travel(60)->seconds();
         $this->actingAs($owner->fresh(), 'web')->post('/api/v1/profile', ['_method' => 'PATCH', 'bio_is_private' => '0'], ['Accept' => 'application/json'])
             ->assertOk()->assertJsonPath('data.bio_is_private', false);
         $this->actingAs($visitor, 'web')->getJson($path)->assertOk()->assertJsonPath('data.bio', 'Biography.');

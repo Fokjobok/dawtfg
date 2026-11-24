@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\V1\CatalogSpecialtyController;
 use App\Http\Controllers\Api\V1\CourseController;
 use App\Http\Controllers\Api\V1\CurrentUserController;
 use App\Http\Controllers\Api\V1\HealthController;
+use App\Http\Controllers\Api\V1\MedalController;
 use App\Http\Controllers\Api\V1\ProfileController;
 use App\Http\Controllers\Api\V1\SpecialtyController;
 use App\Http\Controllers\Api\V1\UserController;
@@ -11,6 +12,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function (): void {
     Route::get('health', HealthController::class)->name('api.v1.health');
+    Route::get('medals/{medal}/image', [MedalController::class, 'image'])->whereNumber('medal')->name('api.v1.medals.image');
     Route::get('profiles/{user}/avatar', [ProfileController::class, 'avatar'])->whereNumber('user')->name('api.v1.profiles.avatar');
     Route::get('courses', [CourseController::class, 'index'])->name('api.v1.courses.index');
     Route::get('catalog/specialties', CatalogSpecialtyController::class)->name('api.v1.catalog.specialties');

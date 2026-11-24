@@ -2,6 +2,7 @@
 
 namespace App\Http\Responses;
 
+use App\Exceptions\ProfileUpdateCooldownException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
@@ -27,6 +28,10 @@ final class ApiErrorResponse
         if ($status === 422 && $exception instanceof ValidationException) {
             $body['error'] = 'Validation failed';
             $body['errors'] = (object) $exception->errors();
+        }
+
+        if ($exception instanceof ProfileUpdateCooldownException) {
+            $body['retry_after'] = $exception->retryAfter;
         }
 
         // Keep protocol headers such as Allow, but discard metadata for the replaced body.

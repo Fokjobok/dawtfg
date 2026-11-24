@@ -43,6 +43,7 @@ const ownProfile = {
   can_edit: true,
   bio_is_private: true,
   bio: 'Owner-only biography.',
+  save_limits: { remaining_updates: 3, retry_after: 0, available_at: null },
 }
 
 function CurrentRoute() {
@@ -172,7 +173,10 @@ it('blocks duplicate logout requests until the account-panel request finishes', 
 it('updates the shared header and account identity after saving the profile', async () => {
   getSession.mockResolvedValue(user)
   getPublicProfile.mockResolvedValue(ownProfile)
-  updateOwnProfile.mockResolvedValue({ ...ownProfile, name: 'Updated student' })
+  updateOwnProfile.mockResolvedValue({
+    data: { ...ownProfile, name: 'Updated student' },
+    meta: { updated: true },
+  })
   await openApp('/profiles/6')
   const input = await screen.findByLabelText('Nombre')
   fireEvent.change(input, { target: { value: 'Updated student' } })
@@ -190,4 +194,32 @@ it('updates the shared header and account identity after saving the profile', as
   await screen.findByRole('heading', { name: 'Mi perfil' })
   expect(screen.getByText('Updated student')).toBeTruthy()
   expect(getSession).toHaveBeenCalledTimes(1)
+})
+
+it('keeps notifications during navigation and discards them when the session ends', async () => {
+  getSession.mockResolvedValue(user)
+  getPublicProfile.mockResolvedValue(ownProfile)
+  updateOwnProfile.mockResolvedValue({
+    data: { ...ownProfile, name: 'Updated student' },
+    meta: { updated: true },
+  })
+  logout.mockResolvedValue(undefined)
+  await openApp('/profiles/6')
+  fireEvent.change(await screen.findByLabelText('Nombre'), {
+    target: { value: 'Updated student' },
+  })
+  fireEvent.submit(
+    screen.getByRole('button', { name: 'Guardar cambios' }).closest('form'),
+  )
+  await screen.findByText('Perfil actualizado correctamente.')
+  fireEvent.click(
+    within(
+      screen.getByRole('navigation', { name: 'Navegación principal' }),
+    ).getByRole('link', { name: 'Mi cuenta' }),
+  )
+  await screen.findByRole('heading', { name: 'Mi perfil' })
+  expect(screen.getByText('Perfil actualizado correctamente.')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'Cerrar sesión' }))
+  await screen.findByRole('button', { name: 'Entrar' })
+  expect(screen.queryByText('Perfil actualizado correctamente.')).toBeNull()
 })

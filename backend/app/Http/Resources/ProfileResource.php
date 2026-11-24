@@ -23,6 +23,28 @@ class ProfileResource extends JsonResource
             'is_private' => (bool) $this->is_private,
             'can_edit' => $canEdit,
             'bio_is_private' => $this->when($canEdit, (bool) $this->bio_is_private),
+            'enrollments_is_private' => $this->when($canEdit, (bool) $this->enrollments_is_private),
+            'medals_is_private' => $this->when($canEdit, (bool) $this->medals_is_private),
+            'medals' => $this->when(Gate::forUser($actor)->allows('viewProfileMedals', $this->resource), fn () => MedalResource::collection(
+                $this->medals()->with('specialty')->orderBy('medals.id')->get(),
+            )),
+            'featured_course_ids' => $this->when($canEdit, fn () => $this->enrollments()->whereNotNull('featured_order')
+                ->orderBy('featured_order')->orderBy('course_id')->pluck('course_id')->map(fn ($id) => (int) $id)->all()),
+            'featured_courses' => $this->when(Gate::forUser($actor)->allows('viewProfileCourses', $this->resource), fn () => PublicCourseResource::collection(
+                $this->enrolledCourses()->publiclyVisible()->wherePivotNotNull('featured_order')
+                    ->orderByPivot('featured_order')->limit(3)->with(['specialty:id,name', 'coach:id,name,avatar_path,is_private,medals_is_private', 'coach.medals.specialty:id,name'])->get(),
+            )),
+            'save_limits' => $this->when($canEdit, function (): array {
+                $now = now()->startOfSecond();
+                $availableAt = $this->profile_save_available_at;
+                $blocked = $availableAt?->isAfter($now) ?? false;
+
+                return [
+                    'remaining_updates' => $availableAt !== null && ! $blocked ? 3 : max(0, 3 - $this->profile_save_count),
+                    'retry_after' => $blocked ? (int) ceil($now->diffInSeconds($availableAt)) : 0,
+                    'available_at' => $blocked ? $availableAt->toISOString() : null,
+                ];
+            }),
             // Global privacy overrides section settings; owners always retain access.
             'bio' => $this->when(Gate::forUser($actor)->allows('viewProfileBio', $this->resource), $this->bio),
         ];

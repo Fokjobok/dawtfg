@@ -39,9 +39,9 @@ describe('App', () => {
     fireEvent.click(button)
 
     expect(button.disabled).toBe(true)
-    expect(screen.getByRole('status').textContent).toBe(
-      'Comprobando la conexión…',
-    )
+    expect(
+      screen.getByText('Comprobando la conexión…').getAttribute('role'),
+    ).toBe('status')
     await screen.findByText('La API está disponible.')
     expect(button.disabled).toBe(false)
     expect(request).toHaveBeenCalledExactlyOnceWith(

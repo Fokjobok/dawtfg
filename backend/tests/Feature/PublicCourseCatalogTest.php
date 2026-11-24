@@ -58,7 +58,7 @@ final class PublicCourseCatalogTest extends TestCase
                 'level' => null,
                 'price' => '0.00',
                 'specialty' => ['id' => $public->specialty_id, 'name' => $public->specialty->name],
-                'coach' => ['id' => $public->coach_id, 'name' => $public->coach->name],
+                'coach' => ['id' => $public->coach_id, 'name' => $public->coach->name, 'avatar_url' => null, 'medals' => []],
                 'cover_url' => null,
             ]]);
         $this->assertStringContainsString('no-store', $response->headers->get('Cache-Control'));
@@ -155,5 +155,34 @@ final class PublicCourseCatalogTest extends TestCase
         $this->getJson('/api/v1/courses')->assertOk()->assertJsonCount(0, 'data');
         $this->actingAs($this->user(UserRole::Student))->getJson($path)->assertForbidden();
         $this->actingAs($course->coach)->get($path)->assertOk();
+    }
+
+    public function test_coach_cards_expose_only_public_identity_even_when_the_coach_profile_is_private(): void
+    {
+        Storage::fake('local');
+        $course = $this->course(['price' => 0]);
+        $coach = $course->coach;
+        $coach->forceFill(['avatar_path' => 'profiles/avatars/coach.png', 'is_private' => true, 'bio' => 'Private biography.'])->save();
+        $png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jM1sAAAAASUVORK5CYII=');
+        Storage::disk('local')->put($coach->avatar_path, $png);
+        $url = '/api/v1/profiles/'.$coach->id.'/avatar?v='.substr(hash('sha256', $coach->avatar_path), 0, 16);
+
+        $response = $this->getJson('/api/v1/courses')->assertOk();
+        $this->assertSame(['id' => $coach->id, 'name' => $coach->name, 'avatar_url' => $url], $response->json('data.0.coach'));
+        $response->assertJsonMissingPath('data.0.coach.avatar_path')->assertJsonMissingPath('data.0.coach.email')
+            ->assertJsonMissingPath('data.0.coach.bio')->assertJsonMissingPath('data.0.coach.medals');
+        $this->get($url)->assertOk()->assertHeader('Content-Type', 'image/png')->assertStreamedContent($png);
+
+        $student = $this->user(UserRole::Student);
+        $enrollment = $course->enrollments()->create(['user_id' => $student->id]);
+        $enrollment->featured_order = 1;
+        $enrollment->save();
+        $this->actingAs($student, 'web')->getJson('/api/v1/enrollments')->assertOk()->assertJsonPath('data.0.course.coach.avatar_url', $url);
+        $this->getJson('/api/v1/profiles/'.$student->id)->assertOk()->assertJsonPath('data.featured_courses.0.coach.avatar_url', $url);
+
+        $coach->avatar_path = 'profiles/avatars/replaced.png';
+        $coach->save();
+        $newUrl = $this->getJson('/api/v1/courses')->assertOk()->json('data.0.coach.avatar_url');
+        $this->assertNotSame($url, $newUrl);
     }
 }

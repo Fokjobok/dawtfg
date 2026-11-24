@@ -24,7 +24,7 @@ El modelo organiza los cursos por especialidad y relaciona cada Coach con las ma
 
 Las FK admiten nulos para conservar cursos anteriores sin inventar responsables ni especialidades. POST `/api/v1/courses` permite crear a Coach y Administrator, con un responsable elegido de rol Coach y perteneciente a la especialidad. El creador Coach debe pertenecer también a esa especialidad; Administrator no necesita pertenecer a ella. Las FK por sí solas solo acreditan existencia. El responsable es único y puede haber varios Coaches adicionales de la misma especialidad. El estado inicial y su modificación posterior mediante PATCH admiten draft/published según los permisos de edición descritos más abajo.
 
-Las eliminaciones de usuarios/especialidades referenciados por cursos se restringen: borrar una cuenta o especialidad no elimina cursos ni rompe referencias. No se añaden borrado lógico, pagos ni inscripciones. EUR es la moneda funcional acordada para esta primera versión; no hay conversión ni cobros. No se duplica el precio con un booleano `is_free`.
+Las eliminaciones de usuarios/especialidades referenciados por cursos se restringen: borrar una cuenta o especialidad no elimina cursos ni rompe referencias. No se añaden borrado lógico ni pagos. Las inscripciones gratuitas se describen más abajo. EUR es la moneda funcional acordada para esta primera versión; no hay conversión ni cobros. No se duplica el precio con un booleano `is_free`.
 
 Relaciones Eloquent utilizadas en pruebas: `User::specialties()`, `Specialty::coaches()` y `Course::additionalCoaches()` con belongsToMany; `Specialty::courses()` con hasMany; `Course::specialty()` y `Course::coach()` con belongsTo. `Specialty::coaches()` filtra por rol Coach, incluso si una asociación errónea de un Student se insertara directamente en la base. El filtro de lectura no sustituye la autorización de escritura del servidor. El precio del modelo Course se convierte a decimal de dos posiciones.
 
@@ -36,6 +36,33 @@ erDiagram
     SPECIALTIES ||--o{ COACH_SPECIALTY : specialty_id
     COURSES ||--o{ COURSE_COACH : course_id
     USERS ||--o{ COURSE_COACH : coach_id
+    USERS ||--o{ ENROLLMENTS : user_id
+    COURSES ||--o{ ENROLLMENTS : course_id
+    SPECIALTIES ||--o{ MEDALS : specialty_id
+    MEDALS ||--o{ MEDAL_USER : medal_id
+    USERS ||--o{ MEDAL_USER : user_id
+    MEDALS {
+        bigint id PK
+        string name
+        bigint specialty_id FK
+        string image_path
+        timestamp created_at
+        timestamp updated_at
+    }
+    MEDAL_USER {
+        bigint user_id PK,FK
+        bigint medal_id PK,FK
+        timestamp created_at
+        timestamp updated_at
+    }
+    ENROLLMENTS {
+        bigint id PK
+        bigint user_id FK
+        bigint course_id FK
+        smallint featured_order
+        timestamp created_at
+        timestamp updated_at
+    }
     COURSES {
         bigint id PK
         bigint coach_id FK
@@ -85,7 +112,7 @@ PATCH `/api/v1/courses/{course}` requiere sesión y CSRF. Responsable, colaborad
 
 El editor Coach debe pertenecer a la especialidad de destino. El responsable y todos los colaboradores resultantes deben ser Coaches asignados a ella; el cambio de materia no altera automáticamente el equipo. Omitir una propiedad conserva su valor. Cuando se incluyen level, coach_id o specialty_id, no se admiten nulos o vacíos. Administrator puede corregir asignaciones heredadas incompletas enviando un equipo válido.
 
-CourseUpdateService bloquea por id ascendente a editor y docentes anteriores/nuevos antes de bloquear el curso. Revalida autorización, roles y pertenencia con los registros actuales. Si el equipo cambia entre la lectura inicial y el bloqueo, responde 409 para recargar; no añade bloqueo optimista de todos los campos ni promete detectar una edición previa de texto. El borrado de cursos tiene una autorización independiente; lecciones, inscripciones y cobros siguen pendientes.
+CourseUpdateService bloquea por id ascendente a editor y docentes anteriores/nuevos antes de bloquear el curso. Revalida autorización, roles y pertenencia con los registros actuales. Si el equipo cambia entre la lectura inicial y el bloqueo, responde 409 para recargar; no añade bloqueo optimista de todos los campos ni promete detectar una edición previa de texto. El borrado de cursos tiene una autorización independiente. Las inscripciones se describen más abajo; lecciones y cobros siguen pendientes.
 
 ### Almacenamiento de la portada
 
@@ -160,3 +187,21 @@ DELETE courses/{course} está reservado al responsable actual y a Administrator,
 La portada se retira después de confirmar el borrado. Un fallo de base conserva fila, equipo y archivo; un fallo de limpieza posterior se registra y puede dejar un archivo privado huérfano, sin fingir que el curso sigue existiendo. La operación devuelve 204 sin cuerpo; el identificador eliminado no provoca resecuenciación de otros cursos. No se promete atomicidad con el disco o con una transacción externa que envolviera el servicio.
 
 El número mostrado por las interfaces utiliza el id existente, compartido por PublicCourseResource y ManagedCourseResource. can_delete se expone solo en la representación privada y se obtiene de la Policy; no hay que deducirlo del rol guardado en el navegador o del permiso de cambio de responsable. cover_url ya está disponible en ambas representaciones para mostrar miniaturas con un tamaño CSS limitado, conservando los archivos originales.
+
+
+## Inscripciones y destacados — 23 de noviembre de 2026
+
+`enrollments` relaciona un Student con un curso mediante id, user_id, course_id, featured_order nullable y timestamps. Unicidad (user_id,course_id) impide duplicados. Ambas FK borran la asociación al eliminar su extremo, sin borrar el otro. Índice por course_id permite las operaciones relacionadas con el curso. featured_order solo admite 1–3 o null y es único por usuario cuando no es null: como máximo tres destacados ordenados. La sustitución de una selección limpia primero las posiciones y asigna después las nuevas dentro de una transacción.
+
+User::enrollments y Course::enrollments son 1:N; Enrollment pertenece a usuario y curso; User::enrolledCourses es N:M con datos del pivot. Solo Student puede crear inscripciones, en cursos gratuitos del catálogo público. Cada propietario consulta/retira solo las suyas, también tras un cambio posterior de rol. La inscripción no concede permisos de edición ni acceso a borradores. Despublicar conserva la asociación, devolviendo course=null en la consulta propia; borrar un curso retira la asociación y su destacado. No se añade estado de pago o progreso ficticio.
+
+users.enrollments_is_private es false inicialmente y no se expone en la identidad de sesión. En perfiles públicos permite ocultar los cursos destacados; el modo privado global prevalece, sin perder la preferencia. Hasta tres course_ids propios forman la selección, modificable mediante PATCH del perfil con su detección de cambios/cooldown; la lista completa sigue siendo privada. Todos los perfiles públicos utilizan exclusivamente Course::publiclyVisible para las tarjetas; una selección conservada de un curso despublicado no permite leerlo. Endpoints y errores en API_GUIDE/OpenAPI.
+
+
+## Medallas asignadas por administración
+
+medals contiene id, name (100), specialty_id obligatorio, image_path nullable y timestamps. La pareja specialty_id/name es única también en SQL; el mismo nombre puede existir en dos juegos. La FK restringe borrar una especialidad con medallas, conservando su significado. No se crea otra entidad categoría/juego. La imagen es opcional y corresponde a la definición, no a la asociación.
+
+medal_user relaciona N:M usuarios y medallas mediante PK compuesta user_id/medal_id y timestamps, con índice por medalla. Cualquier rol puede recibir varias medallas de varias especialidades; no se exige pertenecer a la especialidad porque también reciben estudiantes. FK en cascada eliminan asociaciones al desaparecer cualquiera de los extremos, sin borrar el otro extremo. La API de esta entrega crea definiciones y asigna/retira asociaciones; no incorpora edición/borrado de definiciones ni logros calculados.
+
+users.medals_is_private booleano false representa una sección real. La privacidad global prevalece; el propietario conserva lectura de todas sus medallas y su ajuste. En tarjetas públicas docentes se filtran por specialty_id del curso y se omiten por privacidad sin excepción de rol. Relaciones User::medals(), Medal::users(), Medal::specialty() y Specialty::medals(); carga relacionada en lote en catálogo/inscripciones/destacados. Asignaciones administrativas transaccionales e idempotentes con unicidad SQL, sin consumir guardados del perfil.

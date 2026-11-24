@@ -9,6 +9,8 @@ import EditUserForm from '../components/EditUserForm.jsx'
 
 import { ROLE_LABELS } from '../roles.js'
 
+import MedalPanel from '../components/MedalPanel.jsx'
+
 export default function AdminPage() {
   const [user, setUser] = useState(null)
   const [sessionStatus, setSessionStatus] = useState('loading')
@@ -166,6 +168,8 @@ export default function AdminPage() {
           onCancel={() => setEditingUser(null)}
         />
       )}
+
+      <MedalPanel />
     </section>
   )
 }

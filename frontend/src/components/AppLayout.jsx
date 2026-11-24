@@ -2,13 +2,15 @@ import { Link, NavLink, Outlet } from 'react-router'
 import Container from './Container.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 
+import ToastProvider from './ToastProvider.jsx'
+
 import styles from './AppLayout.module.scss'
 
 export default function AppLayout() {
   const { user } = useAuth()
 
   return (
-    <>
+    <ToastProvider key={user?.id ?? 'guest'}>
       <a className={styles.skipLink} href="#main-content">
         Saltar al contenido
       </a>
@@ -69,6 +71,6 @@ export default function AppLayout() {
       <footer className={styles.footer}>
         <Container>Formación online, a tu ritmo.</Container>
       </footer>
-    </>
+    </ToastProvider>
   )
 }

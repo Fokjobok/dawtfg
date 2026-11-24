@@ -23,3 +23,24 @@
   gap: var(--space-4);
   margin-top: var(--space-6);
 }
+
+.enrollmentActions {
+  display: grid;
+  align-self: end;
+  gap: var(--space-3);
+
+  p {
+    color: var(--color-accent);
+    font-size: 0.875rem;
+  }
+
+  button {
+    width: 100%;
+  }
+
+  a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.75rem;
+  }
+}

@@ -26,7 +26,11 @@ class ProfileController extends Controller
 
     public function update(UpdateProfileRequest $request, ProfileUpdateService $profiles): JsonResponse
     {
-        return (new ProfileResource($profiles->update($request->user('web'), $request->validated())))
+        $updated = $profiles->update($request->user('web'), $request->validated());
+
+        return (new ProfileResource($updated['profile']))->additional([
+            'meta' => ['updated' => $updated['updated']],
+        ])
             ->response()->header('Cache-Control', 'no-store, private');
     }
 

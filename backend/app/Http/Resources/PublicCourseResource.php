@@ -16,7 +16,7 @@ class PublicCourseResource extends JsonResource
             'level' => $this->level?->value,
             'price' => $this->price,
             'specialty' => new SpecialtyResource($this->whenLoaded('specialty')),
-            'coach' => new CoachResource($this->whenLoaded('coach')),
+            'coach' => new PublicCoachResource($this->whenLoaded('coach'), $this->specialty_id),
             'cover_url' => $this->cover_path ? route('api.v1.courses.cover', ['course' => $this->id], false) : null,
         ];
     }

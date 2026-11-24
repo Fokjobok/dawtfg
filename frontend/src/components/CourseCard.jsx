@@ -1,11 +1,12 @@
 import styles from './CourseCard.module.scss'
+import CoachCard from './CoachCard.jsx'
 
 const currency = new Intl.NumberFormat('es-ES', {
   style: 'currency',
   currency: 'EUR',
 })
 
-export default function CourseCard({ course }) {
+export default function CourseCard({ course, children }) {
   const price = Number(course.price)
 
   return (
@@ -34,11 +35,13 @@ export default function CourseCard({ course }) {
         <h2 id={`course-${course.id}-title`}>{course.title}</h2>
 
         <p className={styles.description}>{course.description}</p>
-        <p>Coach: {course.coach.name}</p>
+        <CoachCard coach={course.coach} />
 
         <p className={styles.price}>
           {price === 0 ? 'Gratuito' : currency.format(price)}
         </p>
+
+        {children}
       </div>
     </article>
   )

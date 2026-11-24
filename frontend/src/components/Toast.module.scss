@@ -1,0 +1,63 @@
+.viewport {
+  position: fixed;
+  inset-block-start: var(--space-4);
+  inset-inline-end: var(--space-4);
+  z-index: 20;
+  display: grid;
+  gap: var(--space-3);
+  width: min(24rem, calc(100% - 2rem));
+  max-height: 45svh;
+  overflow-y: auto;
+  pointer-events: none;
+}
+
+.group {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.toast {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-inline-start-width: 4px;
+  border-radius: var(--radius-control);
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+  box-shadow: 0 var(--space-2) var(--space-6) var(--color-background);
+  pointer-events: auto;
+}
+
+.message {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+  overflow-wrap: anywhere;
+
+  p {
+    font-size: 0.875rem;
+  }
+}
+
+.success {
+  border-inline-start-color: var(--color-accent);
+}
+
+.error {
+  border-inline-start-color: var(--color-danger);
+}
+
+.warning {
+  border-inline-start-color: var(--color-link);
+}
+
+.info {
+  border-inline-start-color: var(--color-border);
+}
+
+.close {
+  padding-inline: var(--space-3);
+}

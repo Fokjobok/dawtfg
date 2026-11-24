@@ -4,6 +4,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import ProfilePage from './ProfilePage.jsx'
 import { getPublicProfile, updateOwnProfile } from '../services/profiles.js'
 import { AuthProvider } from '../context/AuthContext.jsx'
+import ToastProvider from '../components/ToastProvider.jsx'
 import { getSession } from '../services/auth.js'
 
 vi.mock('../services/auth.js', () => ({ getSession: vi.fn() }))
@@ -21,18 +22,33 @@ function profile(overrides = {}) {
     avatar_url: '/api/v1/profiles/6/avatar?v=example',
     is_private: false,
     can_edit: false,
+    ...(overrides.can_edit
+      ? {
+          save_limits: {
+            remaining_updates: 3,
+            retry_after: 0,
+            available_at: null,
+          },
+        }
+      : {}),
     ...overrides,
   }
+}
+
+function saveResponse(data, updated = true) {
+  return { data, meta: { updated } }
 }
 
 function openProfile() {
   return render(
     <MemoryRouter initialEntries={['/profiles/6']}>
       <AuthProvider>
-        <Link to="/profiles/8">Otro perfil</Link>
-        <Routes>
-          <Route path="profiles/:userId" element={<ProfilePage />} />
-        </Routes>
+        <ToastProvider>
+          <Link to="/profiles/8">Otro perfil</Link>
+          <Routes>
+            <Route path="profiles/:userId" element={<ProfilePage />} />
+          </Routes>
+        </ToastProvider>
       </AuthProvider>
     </MemoryRouter>,
   )
@@ -42,12 +58,17 @@ beforeEach(() => {
   vi.resetAllMocks()
   getSession.mockResolvedValue(null)
 })
-afterEach(() => cleanup())
+afterEach(() => {
+  cleanup()
+  vi.useRealTimers()
+})
 
 it('announces loading while the profile is pending', () => {
   getPublicProfile.mockReturnValue(new Promise(() => {}))
   openProfile()
-  expect(screen.getByRole('status').textContent).toBe('Cargando perfil…')
+  expect(screen.getByText('Cargando perfil…').getAttribute('role')).toBe(
+    'status',
+  )
   expect(getPublicProfile).toHaveBeenCalledWith('6')
 })
 
@@ -104,8 +125,14 @@ it('distinguishes a permitted empty biography and absent avatar from hidden cont
   getPublicProfile.mockResolvedValue(profile({ avatar_url: null, bio: null }))
   openProfile()
   await screen.findByText('Todavía no hay una biografía.')
-  expect(screen.getByText('Sin avatar.')).toBeTruthy()
+  expect(screen.queryByText('Sin avatar.')).toBeNull()
   expect(screen.queryByRole('img')).toBeNull()
+  expect(
+    screen
+      .getByRole('heading', { name: 'Public student' })
+      .closest('header')
+      .querySelector('[aria-hidden="true"]'),
+  ).toBeNull()
 })
 
 it.each([
@@ -114,7 +141,7 @@ it.each([
 ])('shows the appropriate error for status %s', async (status, message) => {
   getPublicProfile.mockRejectedValue({ status })
   openProfile()
-  expect((await screen.findByRole('alert')).textContent).toBe(message)
+  expect((await screen.findByText(message)).getAttribute('role')).toBe('alert')
   expect(screen.queryByText('Nivel 7')).toBeNull()
 })
 
@@ -144,7 +171,9 @@ it('ignores a late response from a different profile after navigation', async ()
 it('updates the profile heading after the owner saves a name', async () => {
   getPublicProfile.mockResolvedValue(profile({ can_edit: true, bio: null }))
   updateOwnProfile.mockResolvedValue(
-    profile({ can_edit: true, name: 'Updated student', bio: null }),
+    saveResponse(
+      profile({ can_edit: true, name: 'Updated student', bio: null }),
+    ),
   )
   openProfile()
   const input = await screen.findByLabelText('Nombre')
@@ -158,6 +187,7 @@ it('updates the profile heading after the owner saves a name', async () => {
     bio: null,
     is_private: false,
     bio_is_private: false,
+    medals_is_private: false,
   })
   expect(screen.getByText('Perfil actualizado correctamente.')).toBeTruthy()
 })
@@ -190,7 +220,7 @@ it('retains the section preference when switching global privacy and saves boole
     bio_is_private: true,
   })
   getPublicProfile.mockResolvedValue(own)
-  updateOwnProfile.mockResolvedValue({ ...own, is_private: true })
+  updateOwnProfile.mockResolvedValue(saveResponse({ ...own, is_private: true }))
   openProfile()
   const visibility = await screen.findByLabelText('Visibilidad del perfil')
   const section = screen.getByLabelText('Visibilidad de la biografía')
@@ -212,6 +242,7 @@ it('retains the section preference when switching global privacy and saves boole
     bio: 'Biography.',
     is_private: true,
     bio_is_private: true,
+    medals_is_private: false,
   })
   expect(screen.getByText('Tu perfil es privado.')).toBeTruthy()
   expect(screen.getByRole('textbox', { name: 'Biografía' }).value).toBe(
@@ -226,11 +257,13 @@ it('saves an edited biography with independent section privacy and updates the v
     bio_is_private: false,
   })
   getPublicProfile.mockResolvedValue(own)
-  updateOwnProfile.mockResolvedValue({
-    ...own,
-    bio: 'Updated biography.',
-    bio_is_private: true,
-  })
+  updateOwnProfile.mockResolvedValue(
+    saveResponse({
+      ...own,
+      bio: 'Updated biography.',
+      bio_is_private: true,
+    }),
+  )
   openProfile()
   const biography = await screen.findByRole('textbox', { name: 'Biografía' })
   fireEvent.change(biography, { target: { value: 'Updated biography.' } })
@@ -246,9 +279,337 @@ it('saves an edited biography with independent section privacy and updates the v
     bio: 'Updated biography.',
     is_private: false,
     bio_is_private: true,
+    medals_is_private: false,
   })
   expect(screen.getByText('Updated biography.', { selector: 'p' })).toBeTruthy()
   expect(screen.getByLabelText('Visibilidad de la biografía').value).toBe(
     'private',
+  )
+})
+
+it('updates the displayed avatar and clears the file selection after a successful upload', async () => {
+  const own = profile({ can_edit: true, bio: null })
+  getPublicProfile.mockResolvedValue(own)
+  updateOwnProfile.mockResolvedValue(
+    saveResponse({
+      ...own,
+      avatar_url: '/api/v1/profiles/6/avatar?v=replacement',
+    }),
+  )
+  openProfile()
+  const file = new File(['test-only-image'], 'avatar.png', {
+    type: 'image/png',
+  })
+  const input = await screen.findByLabelText('Cambiar avatar')
+  fireEvent.change(input, { target: { files: [file] } })
+  fireEvent.submit(
+    screen.getByRole('button', { name: 'Guardar cambios' }).closest('form'),
+  )
+  await screen.findByText('Perfil actualizado correctamente.')
+  expect(updateOwnProfile).toHaveBeenCalledExactlyOnceWith({
+    name: own.name,
+    bio: null,
+    is_private: false,
+    bio_is_private: false,
+    avatar: file,
+    medals_is_private: false,
+  })
+  expect(
+    screen
+      .getByRole('img', { name: 'Avatar de Public student' })
+      .getAttribute('src'),
+  ).toBe('/api/v1/profiles/6/avatar?v=replacement')
+  expect(screen.getByLabelText('Cambiar avatar').files.length).toBe(0)
+})
+
+it('discards a selected replacement when the owner chooses avatar removal', async () => {
+  const own = profile({ can_edit: true, bio: null })
+  getPublicProfile.mockResolvedValue(own)
+  updateOwnProfile.mockResolvedValue(saveResponse({ ...own, avatar_url: null }))
+  openProfile()
+  const input = await screen.findByLabelText('Cambiar avatar')
+  fireEvent.change(input, {
+    target: {
+      files: [new File(['image'], 'avatar.png', { type: 'image/png' })],
+    },
+  })
+  fireEvent.click(screen.getByLabelText('Eliminar mi avatar actual al guardar'))
+  expect(screen.getByLabelText('Cambiar avatar').files.length).toBe(0)
+  fireEvent.submit(
+    screen.getByRole('button', { name: 'Guardar cambios' }).closest('form'),
+  )
+  await screen.findByText('Perfil actualizado correctamente.')
+  expect(
+    screen.queryByRole('img', { name: 'Avatar de Public student' }),
+  ).toBeNull()
+  expect(screen.queryByText('Sin avatar.')).toBeNull()
+  expect(updateOwnProfile).toHaveBeenCalledExactlyOnceWith({
+    name: own.name,
+    bio: null,
+    is_private: false,
+    bio_is_private: false,
+    remove_avatar: true,
+    medals_is_private: false,
+  })
+  expect(
+    screen.queryByLabelText('Eliminar mi avatar actual al guardar'),
+  ).toBeNull()
+})
+
+it('keeps the selected file and entered data after an avatar validation error', async () => {
+  getPublicProfile.mockResolvedValue(profile({ can_edit: true }))
+  updateOwnProfile.mockRejectedValue({
+    status: 422,
+    errors: { avatar: ['The avatar is too large.'] },
+  })
+  openProfile()
+  const input = await screen.findByLabelText('Cambiar avatar')
+  const file = new File(['image'], 'avatar.png', { type: 'image/png' })
+  fireEvent.change(input, { target: { files: [file] } })
+  fireEvent.change(screen.getByLabelText('Nombre'), {
+    target: { value: 'Pending name' },
+  })
+  fireEvent.submit(
+    screen.getByRole('button', { name: 'Guardar cambios' }).closest('form'),
+  )
+  await screen.findByText('The avatar is too large.')
+  expect(input.getAttribute('aria-invalid')).toBe('true')
+  expect(input.getAttribute('aria-describedby')).toContain(
+    'profile-avatar-error',
+  )
+  expect(input.files[0]).toBe(file)
+  expect(screen.getByLabelText('Nombre').value).toBe('Pending name')
+  expect(screen.getByRole('heading', { name: 'Public student' })).toBeTruthy()
+})
+
+it('blocks unchanged submissions and disables saving again when all edits are reverted', async () => {
+  getPublicProfile.mockResolvedValue(
+    profile({ can_edit: true, bio: 'Saved biography.', bio_is_private: false }),
+  )
+  openProfile()
+  const name = await screen.findByLabelText('Nombre')
+  const button = screen.getByRole('button', { name: 'Guardar cambios' })
+  const form = button.closest('form')
+  expect(button.disabled).toBe(true)
+  fireEvent.submit(form)
+
+  for (const [control, changed, original] of [
+    [name, 'Edited name', 'Public student'],
+    [
+      screen.getByRole('textbox', { name: 'Biografía' }),
+      'Edited biography.',
+      'Saved biography.',
+    ],
+    [screen.getByLabelText('Visibilidad del perfil'), 'private', 'public'],
+    [screen.getByLabelText('Visibilidad de la biografía'), 'private', 'public'],
+    [screen.getByLabelText('Visibilidad de las medallas'), 'private', 'public'],
+  ]) {
+    fireEvent.change(control, { target: { value: changed } })
+    expect(button.disabled).toBe(false)
+    fireEvent.change(control, { target: { value: original } })
+    expect(button.disabled).toBe(true)
+    fireEvent.submit(form)
+  }
+
+  fireEvent.change(name, { target: { value: ' Public student ' } })
+  expect(button.disabled).toBe(true)
+  expect(updateOwnProfile).not.toHaveBeenCalled()
+  expect(screen.queryByText('Perfil actualizado correctamente.')).toBeNull()
+})
+
+it('restores a server cooldown on load while preserving edits until it expires', async () => {
+  vi.useFakeTimers()
+  getPublicProfile.mockResolvedValue(
+    profile({
+      can_edit: true,
+      save_limits: {
+        remaining_updates: 0,
+        retry_after: 20,
+        available_at: new Date(Date.now() + 20000).toISOString(),
+      },
+    }),
+  )
+  await act(async () => {
+    openProfile()
+  })
+  const name = screen.getByLabelText('Nombre')
+  const button = screen.getByRole('button', { name: 'Guardar cambios' })
+  expect(screen.getByText('Podrás guardar de nuevo en 20 s.')).toBeTruthy()
+  expect(name.closest('fieldset').disabled).toBe(false)
+  fireEvent.change(name, { target: { value: 'Pending name' } })
+  expect(button.disabled).toBe(true)
+  fireEvent.submit(button.closest('form'))
+  expect(updateOwnProfile).not.toHaveBeenCalled()
+  await act(async () => {
+    vi.advanceTimersByTime(19000)
+  })
+  expect(screen.getByText('Podrás guardar de nuevo en 1 s.')).toBeTruthy()
+  await act(async () => {
+    vi.advanceTimersByTime(1000)
+  })
+  expect(button.disabled).toBe(false)
+  expect(name.value).toBe('Pending name')
+  expect(updateOwnProfile).not.toHaveBeenCalled()
+  fireEvent.change(name, { target: { value: 'Public student' } })
+  expect(button.disabled).toBe(true)
+})
+
+it('starts the cooldown after the third confirmed save and enables only pending changes afterward', async () => {
+  vi.useFakeTimers()
+  const own = profile({ can_edit: true })
+  getPublicProfile.mockResolvedValue(own)
+  for (const save of [1, 2, 3]) {
+    updateOwnProfile.mockResolvedValueOnce(
+      saveResponse({
+        ...own,
+        name: `Saved ${save}`,
+        save_limits: {
+          remaining_updates: 3 - save,
+          retry_after: save === 3 ? 60 : 0,
+          available_at:
+            save === 3 ? new Date(Date.now() + 60000).toISOString() : null,
+        },
+      }),
+    )
+  }
+  await act(async () => {
+    openProfile()
+  })
+  const name = screen.getByLabelText('Nombre')
+  const button = screen.getByRole('button', { name: 'Guardar cambios' })
+  for (const save of [1, 2, 3]) {
+    fireEvent.change(name, { target: { value: `Saved ${save}` } })
+    expect(button.disabled).toBe(false)
+    await act(async () => {
+      fireEvent.submit(button.closest('form'))
+    })
+    expect(updateOwnProfile).toHaveBeenCalledTimes(save)
+    expect(button.disabled).toBe(true)
+  }
+  expect(screen.getByText('Podrás guardar de nuevo en 60 s.')).toBeTruthy()
+  fireEvent.change(name, { target: { value: 'Pending fourth save' } })
+  expect(name.closest('fieldset').disabled).toBe(false)
+  fireEvent.submit(button.closest('form'))
+  expect(updateOwnProfile).toHaveBeenCalledTimes(3)
+  await act(async () => {
+    vi.advanceTimersByTime(60000)
+  })
+  expect(button.disabled).toBe(false)
+  expect(name.value).toBe('Pending fourth save')
+  fireEvent.change(name, { target: { value: 'Saved 3' } })
+  expect(button.disabled).toBe(true)
+})
+
+it('honors a 429 received from another session and keeps pending data during the wait', async () => {
+  vi.useFakeTimers()
+  getPublicProfile.mockResolvedValue(profile({ can_edit: true }))
+  updateOwnProfile.mockRejectedValue({ status: 429, retryAfter: 7 })
+  await act(async () => {
+    openProfile()
+  })
+  const name = screen.getByLabelText('Nombre')
+  fireEvent.change(name, { target: { value: 'Unsaved name' } })
+  const button = screen.getByRole('button', { name: 'Guardar cambios' })
+  await act(async () => {
+    fireEvent.submit(button.closest('form'))
+  })
+  expect(
+    screen
+      .getByText('Podrás guardar de nuevo al terminar la cuenta atrás.')
+      .closest('[role="status"]'),
+  ).not.toBeNull()
+  expect(screen.getByText('Podrás guardar de nuevo en 7 s.')).toBeTruthy()
+  expect(button.disabled).toBe(true)
+  expect(name.value).toBe('Unsaved name')
+  expect(name.closest('fieldset').disabled).toBe(false)
+  fireEvent.submit(button.closest('form'))
+  expect(updateOwnProfile).toHaveBeenCalledTimes(1)
+  await act(async () => {
+    vi.advanceTimersByTime(7000)
+  })
+  expect(button.disabled).toBe(false)
+  expect(name.value).toBe('Unsaved name')
+})
+
+it('reports a server no-op without claiming a successful update and resets the baseline', async () => {
+  const own = profile({ can_edit: true })
+  getPublicProfile.mockResolvedValue(own)
+  updateOwnProfile.mockResolvedValue(
+    saveResponse({ ...own, name: 'Current server name' }, false),
+  )
+  openProfile()
+  const name = await screen.findByLabelText('Nombre')
+  fireEvent.change(name, { target: { value: 'Current server name' } })
+  fireEvent.submit(
+    screen.getByRole('button', { name: 'Guardar cambios' }).closest('form'),
+  )
+  await screen.findByText('Los datos ya estaban actualizados.')
+  expect(screen.queryByText('Perfil actualizado correctamente.')).toBeNull()
+  expect(
+    screen.getByRole('heading', { name: 'Current server name' }),
+  ).toBeTruthy()
+  expect(screen.getByRole('button', { name: 'Guardar cambios' }).disabled).toBe(
+    true,
+  )
+})
+
+it('prevents duplicate requests while saving and clears pending changes after confirmation', async () => {
+  let finishSave
+  const own = profile({ can_edit: true })
+  getPublicProfile.mockResolvedValue(own)
+  updateOwnProfile.mockReturnValue(
+    new Promise((resolve) => {
+      finishSave = resolve
+    }),
+  )
+  openProfile()
+  const name = await screen.findByLabelText('Nombre')
+  fireEvent.change(name, { target: { value: 'Saved once' } })
+  const form = screen
+    .getByRole('button', { name: 'Guardar cambios' })
+    .closest('form')
+  fireEvent.submit(form)
+  expect(screen.getByRole('button', { name: 'Guardando…' }).disabled).toBe(true)
+  expect(name.closest('fieldset').disabled).toBe(true)
+  fireEvent.submit(form)
+  expect(updateOwnProfile).toHaveBeenCalledTimes(1)
+  await act(async () => {
+    finishSave(saveResponse({ ...own, name: 'Saved once' }))
+  })
+  expect(screen.getByRole('button', { name: 'Guardar cambios' }).disabled).toBe(
+    true,
+  )
+  expect(name.closest('fieldset').disabled).toBe(false)
+})
+
+it('preserves medal privacy under the global switch and saves the section preference independently', async () => {
+  const own = profile({ can_edit: true, medals_is_private: false })
+  getPublicProfile.mockResolvedValue(own)
+  updateOwnProfile.mockResolvedValue(
+    saveResponse({ ...own, medals_is_private: true }),
+  )
+  openProfile()
+  const section = await screen.findByLabelText('Visibilidad de las medallas')
+  const visibility = screen.getByLabelText('Visibilidad del perfil')
+  fireEvent.change(section, { target: { value: 'private' } })
+  fireEvent.change(visibility, { target: { value: 'private' } })
+  expect(section.disabled).toBe(true)
+  expect(section.value).toBe('private')
+  fireEvent.change(visibility, { target: { value: 'public' } })
+  expect(section.disabled).toBe(false)
+  expect(section.value).toBe('private')
+  fireEvent.submit(
+    screen.getByRole('button', { name: 'Guardar cambios' }).closest('form'),
+  )
+  await screen.findByText('Perfil actualizado correctamente.')
+  expect(updateOwnProfile).toHaveBeenCalledExactlyOnceWith({
+    name: own.name,
+    bio: null,
+    is_private: false,
+    bio_is_private: false,
+    medals_is_private: true,
+  })
+  expect(screen.getByRole('button', { name: 'Guardar cambios' }).disabled).toBe(
+    true,
   )
 })

@@ -8,12 +8,30 @@ export async function getPublicProfile(userId) {
 }
 
 export async function updateOwnProfile(details) {
+  const { avatar, ...fields } = details
+  let body = fields
+
+  if (avatar) {
+    body = new FormData()
+    body.append('_method', 'PATCH')
+
+    for (const [field, value] of Object.entries(fields)) {
+      body.append(
+        field,
+        typeof value === 'boolean' ? (value ? '1' : '0') : String(value ?? ''),
+      )
+    }
+
+    body.append('avatar', avatar)
+  }
+
   await prepareCsrf()
 
   const response = await apiRequest('/profile', {
-    method: 'PATCH',
-    body: details,
+    method: avatar ? 'POST' : 'PATCH',
+    body,
+    signal: AbortSignal.timeout(30000),
   })
 
-  return response.data
+  return response
 }

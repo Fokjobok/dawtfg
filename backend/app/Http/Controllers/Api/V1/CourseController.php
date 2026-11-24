@@ -31,7 +31,7 @@ class CourseController extends Controller
         return PublicCourseResource::collection(Course::publiclyVisible()
             ->when(isset($filters['specialty_id']), fn ($query) => $query->where('specialty_id', $filters['specialty_id']))
             ->when(isset($filters['level']), fn ($query) => $query->where('level', $filters['level']))
-            ->with(['specialty:id,name', 'coach:id,name'])->orderByDesc('id')
+            ->with(['specialty:id,name', 'coach:id,name,avatar_path,is_private,medals_is_private', 'coach.medals.specialty:id,name'])->orderByDesc('id')
             ->paginate($input['per_page'] ?? 20)->withQueryString())
             ->response()->header('Cache-Control', 'no-store');
     }

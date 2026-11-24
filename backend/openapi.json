@@ -1872,7 +1872,7 @@
           "Perfiles"
         ],
         "summary": "Edita el perfil propio con sesión y CSRF",
-        "description": "Cualquier rol edita solo su perfil. Para archivo se envía POST multipart a esta misma URL con _method=PATCH. Sustituir o retirar avatar limpia el anterior tras confirmar la transacción. Un fallo posterior de limpieza se registra sin falsear el guardado.",
+        "description": "Cualquier rol edita solo su perfil. Para archivo se envía POST multipart a esta misma URL con _method=PATCH. Sustituir o retirar avatar limpia el anterior tras confirmar la transacción. Un fallo posterior de limpieza se registra sin falsear el guardado. Solo los cambios efectivos consumen guardados. Tras tres se bloquea 60 segundos por cuenta, con estado persistente y comprobación transaccional. Un envío idéntico devuelve 200 con meta.updated=false sin escribir ni contar; no debe generar un aviso de éxito de actualización.",
         "security": [
           {
             "sessionCookie": []
@@ -1905,11 +1905,11 @@
         },
         "responses": {
           "200": {
-            "description": "Perfil propio actualizado. Nombre, avatar y nivel general siguen públicos. Las preferencias por sección se conservan al cambiar el modo global. Cache-Control: no-store, private.",
+            "description": "Perfil propio y meta.updated; true si se guardó un cambio efectivo, false si los datos ya eran iguales. save_limits informa el estado actual, solo para el propietario. Cache-Control: no-store, private.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/OwnProfileResponse"
+                  "$ref": "#/components/schemas/ProfileUpdateResponse"
                 }
               }
             }
@@ -1925,6 +1925,9 @@
           },
           "422": {
             "$ref": "#/components/responses/ValidationError"
+          },
+          "429": {
+            "$ref": "#/components/responses/ProfileSaveCooldown"
           },
           "500": {
             "$ref": "#/components/responses/ServerError"
@@ -2044,6 +2047,1109 @@
           },
           "500": {
             "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/v1/enrollments": {
+      "get": {
+        "tags": [
+          "Inscripciones"
+        ],
+        "operationId": "listOwnEnrollments",
+        "summary": "Lista las inscripciones propias",
+        "description": "Sesión web, cualquier rol para consultar inscripciones propias previas; nunca permite consultar las de otros, tampoco a Administrator. Orden id descendente. Cache-Control no-store/private. El filtro por IDs permite consultar el estado de la página actual del catálogo sin una petición por tarjeta.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "name": "filter[course_ids][]",
+            "in": "query",
+            "style": "form",
+            "explode": true,
+            "required": false,
+            "schema": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 100,
+              "uniqueItems": true,
+              "items": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Página de inscripciones propias, también vacía.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnrollmentCollection"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      },
+      "head": {
+        "tags": [
+          "Inscripciones"
+        ],
+        "operationId": "headOwnEnrollments",
+        "summary": "Lista las inscripciones propias",
+        "description": "Sesión web, cualquier rol para consultar inscripciones propias previas; nunca permite consultar las de otros, tampoco a Administrator. Orden id descendente. Cache-Control no-store/private. El filtro por IDs permite consultar el estado de la página actual del catálogo sin una petición por tarjeta. HEAD conserva cabeceras/estado y omite el cuerpo.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "name": "filter[course_ids][]",
+            "in": "query",
+            "style": "form",
+            "explode": true,
+            "required": false,
+            "schema": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 100,
+              "uniqueItems": true,
+              "items": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Página de inscripciones propias, también vacía."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/v1/enrollments/{enrollment}": {
+      "get": {
+        "tags": [
+          "Inscripciones"
+        ],
+        "operationId": "getOwnEnrollment",
+        "summary": "Consulta una inscripción propia",
+        "description": "Solo propietario, sin excepción para otro Administrator. Sesión web y no-store/private.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "enrollment",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Inscripción propia y curso público actual, o course=null.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnrollmentResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/EnrollmentNotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Inscripciones"
+        ],
+        "operationId": "deleteOwnEnrollment",
+        "summary": "Retira una inscripción propia",
+        "description": "Sesión web y CSRF. Solo propietario, incluso si su rol cambió desde la inscripción. Elimina su selección destacada al borrar la fila, sin borrar usuario/curso ni consumir el cooldown del perfil. Borrado confirmado 204; inexistente 404. No-store/private.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "enrollment",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "X-XSRF-TOKEN",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Inscripción retirada."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/EnrollmentNotFound"
+          },
+          "419": {
+            "$ref": "#/components/responses/SessionExpired"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      },
+      "head": {
+        "tags": [
+          "Inscripciones"
+        ],
+        "operationId": "headOwnEnrollment",
+        "summary": "Consulta una inscripción propia",
+        "description": "Solo propietario, sin excepción para otro Administrator. Sesión web y no-store/private. HEAD conserva cabeceras/estado y omite el cuerpo.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "enrollment",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Inscripción propia y curso público actual, o course=null."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/EnrollmentNotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/v1/courses/{course}/enrollments": {
+      "post": {
+        "tags": [
+          "Inscripciones"
+        ],
+        "operationId": "createOwnEnrollment",
+        "summary": "Inscribe al Student en un curso gratuito publicado",
+        "description": "Solo Student conectado, CSRF. Sin cuerpo necesario; user_id/course_id/price/status/featured_order no son editables. Revalida rol e inscripción bajo bloqueo user -> course. Curso no visible 404; curso con precio 422. Duplicado devuelve 200 con la misma inscripción; nuevo 201 y Location. Sin cobros o acceso a endpoints privados de gestión. No-store/private.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "course",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "X-XSRF-TOKEN",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "La inscripción ya existía.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnrollmentResponse"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Inscripción creada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnrollmentResponse"
+                }
+              }
+            },
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "URI de la inscripción propia."
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "description": "Curso inexistente o fuera del catálogo público.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "419": {
+            "$ref": "#/components/responses/SessionExpired"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/v1/medals": {
+      "get": {
+        "tags": [
+          "Medallas"
+        ],
+        "operationId": "listMedals",
+        "summary": "Lista medallas como Administrator",
+        "description": "Catálogo administrativo, nombre ascendente e ID de desempate; filtro opcional de especialidad. Crear no asigna a usuarios.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "name": "filter[specialty_id]",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Respuesta privada, Cache-Control: no-store, private.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MedalCollection"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      },
+      "head": {
+        "tags": [
+          "Medallas"
+        ],
+        "operationId": "headMedals",
+        "summary": "Lista medallas como Administrator (cabeceras)",
+        "description": "Catálogo administrativo, nombre ascendente e ID de desempate; filtro opcional de especialidad. Crear no asigna a usuarios.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "name": "filter[specialty_id]",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Respuesta privada, Cache-Control: no-store, private. Sin cuerpo."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated",
+            "description": " Sin cuerpo."
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden",
+            "description": " Sin cuerpo."
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError",
+            "description": " Sin cuerpo."
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError",
+            "description": " Sin cuerpo."
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Medallas"
+        ],
+        "operationId": "createMedal",
+        "summary": "Crea una medalla como Administrator",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-XSRF-TOKEN",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Token URL-decodificado de la cookie; Swagger lo prepara automáticamente."
+          }
+        ],
+        "description": "Sesión web/CSRF incluso sin Origin. Imagen opcional en disco privado, con lectura pública específica. Nombre único por especialidad, incluidos intentos concurrentes (422). No se asigna automáticamente a nadie. Compensación del archivo nuevo ante fallo transaccional.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StoreMedalInput"
+              },
+              "example": {
+                "name": "Táctica avanzada",
+                "specialty_id": 1
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/StoreMedalMultipartInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Medalla creada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MedalEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "419": {
+            "$ref": "#/components/responses/SessionExpired"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/v1/medal-recipients": {
+      "get": {
+        "tags": [
+          "Medallas"
+        ],
+        "operationId": "listMedalRecipients",
+        "summary": "Busca usuarios destinatarios como Administrator",
+        "description": "Todos los roles, incluido Administrator, sin modificar el listado administrativo habitual. Solo ID/nombre/rol; orden nombre e ID, filtro de nombre opcional.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "name": "filter[name]",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Respuesta privada, Cache-Control: no-store, private.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MedalRecipientCollection"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      },
+      "head": {
+        "tags": [
+          "Medallas"
+        ],
+        "operationId": "headMedalRecipients",
+        "summary": "Busca usuarios destinatarios como Administrator (cabeceras)",
+        "description": "Todos los roles, incluido Administrator, sin modificar el listado administrativo habitual. Solo ID/nombre/rol; orden nombre e ID, filtro de nombre opcional.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "name": "filter[name]",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Respuesta privada, Cache-Control: no-store, private. Sin cuerpo."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated",
+            "description": " Sin cuerpo."
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden",
+            "description": " Sin cuerpo."
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError",
+            "description": " Sin cuerpo."
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError",
+            "description": " Sin cuerpo."
+          }
+        }
+      }
+    },
+    "/api/v1/users/{user}/medals": {
+      "get": {
+        "tags": [
+          "Medallas"
+        ],
+        "operationId": "listUserMedals",
+        "summary": "Consulta medallas asignadas como Administrator",
+        "description": "Lista de asignaciones administrativas de una cuenta de cualquier rol. Orden nombre e ID, filtro de especialidad opcional. No es una lectura de su perfil privado.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "name": "filter[specialty_id]",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Respuesta privada, Cache-Control: no-store, private.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MedalCollection"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "description": "Usuario o medalla inexistente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      },
+      "head": {
+        "tags": [
+          "Medallas"
+        ],
+        "operationId": "headUserMedals",
+        "summary": "Consulta medallas asignadas como Administrator (cabeceras)",
+        "description": "Lista de asignaciones administrativas de una cuenta de cualquier rol. Orden nombre e ID, filtro de especialidad opcional. No es una lectura de su perfil privado.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "name": "filter[specialty_id]",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Respuesta privada, Cache-Control: no-store, private. Sin cuerpo."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated",
+            "description": " Sin cuerpo."
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden",
+            "description": " Sin cuerpo."
+          },
+          "404": {
+            "description": "Usuario inexistente. Sin cuerpo."
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError",
+            "description": " Sin cuerpo."
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError",
+            "description": " Sin cuerpo."
+          }
+        }
+      }
+    },
+    "/api/v1/users/{user}/medals/{medal}": {
+      "put": {
+        "tags": [
+          "Medallas"
+        ],
+        "operationId": "assignUserMedal",
+        "summary": "Asigna una medalla como Administrator",
+        "description": "Sin cuerpo. Usuario de cualquier rol, sin exigir pertenencia a la especialidad. PUT idempotente: 200, una sola asociación y fechas originales conservadas al repetir. Revalida rol bajo bloqueo de usuarios en orden de ID y luego medalla. No consume el cooldown del perfil.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "medal",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "X-XSRF-TOKEN",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Token URL-decodificado de la cookie; Swagger lo prepara automáticamente."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Respuesta privada, Cache-Control: no-store, private.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MedalEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "description": "Usuario o medalla inexistente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "419": {
+            "$ref": "#/components/responses/SessionExpired"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Medallas"
+        ],
+        "operationId": "revokeUserMedal",
+        "summary": "Retira una medalla como Administrator",
+        "description": "Sin cuerpo. Baja idempotente 204 incluso si ya no estaba asignada. No borra usuario, medalla, imagen ni especialidad y no consume el cooldown del perfil.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "medal",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "X-XSRF-TOKEN",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Token URL-decodificado de la cookie; Swagger lo prepara automáticamente."
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Asignación retirada; sin cuerpo."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "description": "Usuario o medalla inexistente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "419": {
+            "$ref": "#/components/responses/SessionExpired"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/v1/medals/{medal}/image": {
+      "get": {
+        "operationId": "getMedalImage",
+        "tags": [
+          "Medallas"
+        ],
+        "summary": "Obtiene la imagen pública de una medalla",
+        "security": [],
+        "parameters": [
+          {
+            "name": "medal",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Imagen pública de la definición, nunca de sus destinatarios. MIME real, inline, no-store/private, nosniff y CSP restrictiva.",
+            "content": {
+              "image/jpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/webp": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Medalla o imagen inexistente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      },
+      "head": {
+        "operationId": "headMedalImage",
+        "tags": [
+          "Medallas"
+        ],
+        "summary": "Obtiene la imagen pública de una medalla (cabeceras)",
+        "security": [],
+        "parameters": [
+          {
+            "name": "medal",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Imagen pública de la definición, nunca de sus destinatarios. MIME real, inline, no-store/private, nosniff y CSP restrictiva. Sin cuerpo."
+          },
+          "404": {
+            "description": "Medalla o imagen inexistente. Sin cuerpo."
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError",
+            "description": " Sin cuerpo."
           }
         }
       }
@@ -2816,7 +3922,7 @@
             "$ref": "#/components/schemas/Specialty"
           },
           "coach": {
-            "$ref": "#/components/schemas/Coach"
+            "$ref": "#/components/schemas/PublicCoach"
           },
           "cover_url": {
             "anyOf": [
@@ -3332,6 +4438,43 @@
           "bio_is_private": {
             "type": "boolean",
             "description": "Preferencia de la sección biografía, solo presente para el propietario. Se conserva al activar o desactivar el modo privado general."
+          },
+          "save_limits": {
+            "$ref": "#/components/schemas/ProfileSaveLimits",
+            "description": "Solo presente en el perfil del propietario. No se expone a terceros ni en la identidad de sesión."
+          },
+          "featured_courses": {
+            "type": "array",
+            "maxItems": 3,
+            "items": {
+              "$ref": "#/components/schemas/PublicCourse"
+            },
+            "description": "Cursos inscritos elegidos por el propietario, en orden. Solo cursos del catálogo público. Se omite para terceros si el perfil o la sección son privados; no revela recuentos ocultos."
+          },
+          "enrollments_is_private": {
+            "type": "boolean",
+            "description": "Preferencia de privacidad de los cursos destacados. Solo se devuelve al propietario; el modo privado global prevalece sin borrarla."
+          },
+          "featured_course_ids": {
+            "type": "array",
+            "maxItems": 3,
+            "uniqueItems": true,
+            "items": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "description": "Selección propia ordenada. Puede conservar referencias a cursos que dejaron de ser públicos; sus datos no se muestran en featured_courses."
+          },
+          "medals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Medal"
+            },
+            "description": "Medallas reales de todas las especialidades, ordenadas por ID. Solo el propietario o terceros si perfil y sección son públicos. En otro caso se omite sin IDs o recuentos."
+          },
+          "medals_is_private": {
+            "type": "boolean",
+            "description": "Preferencia de sección solo del propietario. La privacidad global prevalece conservando esta preferencia."
           }
         }
       },
@@ -3346,7 +4489,13 @@
           "can_edit",
           "bio",
           "level",
-          "bio_is_private"
+          "bio_is_private",
+          "save_limits",
+          "featured_courses",
+          "enrollments_is_private",
+          "featured_course_ids",
+          "medals",
+          "medals_is_private"
         ],
         "properties": {
           "id": {
@@ -3388,6 +4537,43 @@
           "bio_is_private": {
             "type": "boolean",
             "description": "Preferencia de la sección biografía, solo presente para el propietario. Se conserva al activar o desactivar el modo privado general."
+          },
+          "save_limits": {
+            "$ref": "#/components/schemas/ProfileSaveLimits",
+            "description": "Solo presente en el perfil del propietario. No se expone a terceros ni en la identidad de sesión."
+          },
+          "featured_courses": {
+            "type": "array",
+            "maxItems": 3,
+            "items": {
+              "$ref": "#/components/schemas/PublicCourse"
+            },
+            "description": "Cursos inscritos elegidos por el propietario, en orden. Solo cursos del catálogo público. Se omite para terceros si el perfil o la sección son privados; no revela recuentos ocultos."
+          },
+          "enrollments_is_private": {
+            "type": "boolean",
+            "description": "Preferencia de privacidad de los cursos destacados. Solo se devuelve al propietario; el modo privado global prevalece sin borrarla."
+          },
+          "featured_course_ids": {
+            "type": "array",
+            "maxItems": 3,
+            "uniqueItems": true,
+            "items": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "description": "Selección propia ordenada. Puede conservar referencias a cursos que dejaron de ser públicos; sus datos no se muestran en featured_courses."
+          },
+          "medals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Medal"
+            },
+            "description": "Medallas reales de todas las especialidades, ordenadas por ID. Solo el propietario o terceros si perfil y sección son públicos. En otro caso se omite sin IDs o recuentos."
+          },
+          "medals_is_private": {
+            "type": "boolean",
+            "description": "Preferencia de sección solo del propietario. La privacidad global prevalece conservando esta preferencia."
           }
         }
       },
@@ -3419,7 +4605,7 @@
         "type": "object",
         "minProperties": 1,
         "additionalProperties": false,
-        "description": "Edición parcial del perfil propio y de la privacidad de la biografía. No permite cambiar nivel, experiencia, rangos por materia, rol, correo, credenciales, identificadores, especialidades o rutas internas.",
+        "description": "Edición parcial del perfil propio y de la privacidad de la biografía. No permite cambiar nivel, experiencia, rangos por materia, rol, correo, credenciales, identificadores, especialidades o rutas internas. medals_is_private participa en no-op y cooldown; no permite autoasignar medallas mediante medals o medal_ids.",
         "properties": {
           "name": {
             "type": "string",
@@ -3441,6 +4627,22 @@
           },
           "bio_is_private": {
             "type": "boolean"
+          },
+          "enrollments_is_private": {
+            "type": "boolean"
+          },
+          "featured_course_ids": {
+            "type": "array",
+            "maxItems": 3,
+            "uniqueItems": true,
+            "items": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "description": "Reemplaza la selección ordenada con cursos de inscripciones propias. [] la vacía. Cuenta como modificación del perfil solo si cambia."
+          },
+          "medals_is_private": {
+            "type": "boolean"
           }
         }
       },
@@ -3448,7 +4650,7 @@
         "type": "object",
         "minProperties": 2,
         "additionalProperties": false,
-        "description": "Edición parcial del perfil propio y de la privacidad de la biografía. No permite cambiar nivel, experiencia, rangos por materia, rol, correo, credenciales, identificadores, especialidades o rutas internas.",
+        "description": "Edición parcial del perfil propio y de la privacidad de la biografía. No permite cambiar nivel, experiencia, rangos por materia, rol, correo, credenciales, identificadores, especialidades o rutas internas. medals_is_private participa en no-op y cooldown; no permite autoasignar medallas mediante medals o medal_ids.",
         "properties": {
           "name": {
             "type": "string",
@@ -3494,11 +4696,531 @@
               1
             ],
             "description": "En multipart enviar 0 o 1; JSON usa booleanos."
+          },
+          "enrollments_is_private": {
+            "type": "integer",
+            "enum": [
+              0,
+              1
+            ]
+          },
+          "featured_course_ids": {
+            "oneOf": [
+              {
+                "type": "array",
+                "maxItems": 3,
+                "uniqueItems": true,
+                "items": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              },
+              {
+                "type": "string",
+                "maxLength": 128,
+                "description": "Array JSON, incluido [] para vaciar. Objetos u otros tipos no son válidos."
+              }
+            ],
+            "description": "Array multipart habitual o cadena JSON. Deben ser inscripciones propias; el orden es significativo."
+          },
+          "medals_is_private": {
+            "type": "integer",
+            "enum": [
+              0,
+              1
+            ]
           }
         },
         "required": [
           "_method"
         ]
+      },
+      "ProfileSaveLimits": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "remaining_updates",
+          "retry_after",
+          "available_at"
+        ],
+        "properties": {
+          "remaining_updates": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 3,
+            "description": "Guardados efectivos disponibles en el bloque actual; vuelve a 3 al vencer la pausa."
+          },
+          "retry_after": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 60,
+            "description": "Segundos restantes de espera calculados por el servidor."
+          },
+          "available_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Fin del bloqueo en UTC; null cuando no hay bloqueo activo."
+          }
+        }
+      },
+      "ProfileUpdateResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "data",
+          "meta"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/OwnProfile"
+          },
+          "meta": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "updated"
+            ],
+            "properties": {
+              "updated": {
+                "type": "boolean",
+                "description": "true solo si se guardó un cambio efectivo. false no modifica fechas ni consume un guardado; incluye avatar de bytes idénticos o retirada de un avatar inexistente."
+              }
+            }
+          }
+        }
+      },
+      "ProfileSaveCooldownError": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "error",
+          "code",
+          "retry_after"
+        ],
+        "properties": {
+          "error": {
+            "type": "string",
+            "const": "Too Many Requests"
+          },
+          "code": {
+            "type": "integer",
+            "const": 429
+          },
+          "retry_after": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 60
+          }
+        }
+      },
+      "Enrollment": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "course_id",
+          "enrolled_at",
+          "featured_order",
+          "course"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "course_id": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "enrolled_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "featured_order": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "maximum": 3
+          },
+          "course": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PublicCourse"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Datos públicos actuales, o null si el curso dejó de estar en el catálogo. Nunca expone un borrador a un estudiante."
+          }
+        }
+      },
+      "EnrollmentResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/Enrollment"
+          }
+        }
+      },
+      "EnrollmentCollection": {
+        "type": "object",
+        "required": [
+          "data",
+          "links",
+          "meta"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Enrollment"
+            }
+          },
+          "links": {
+            "type": "object",
+            "properties": {
+              "first": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "last": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "prev": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "next": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          },
+          "meta": {
+            "type": "object",
+            "required": [
+              "current_page",
+              "last_page",
+              "per_page",
+              "total"
+            ],
+            "properties": {
+              "current_page": {
+                "type": "integer"
+              },
+              "last_page": {
+                "type": "integer"
+              },
+              "per_page": {
+                "type": "integer"
+              },
+              "total": {
+                "type": "integer"
+              }
+            }
+          }
+        }
+      },
+      "PublicCoach": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name",
+          "avatar_url"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "name": {
+            "type": "string"
+          },
+          "avatar_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Avatar público versionado del Coach, incluso con perfil privado. null si no existe. Sin biografía, correo o rutas internas."
+          },
+          "medals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Medal"
+            },
+            "description": "Solo medallas asignadas de la especialidad del curso, ordenadas por ID. Se omite completamente si el perfil o la sección son privados, también al propietario en tarjetas del catálogo."
+          }
+        }
+      },
+      "Medal": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name",
+          "specialty",
+          "image_url"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "specialty": {
+            "$ref": "#/components/schemas/Specialty"
+          },
+          "image_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Imagen pública de la definición; no revela sus destinatarios. null si no existe."
+          }
+        }
+      },
+      "MedalEnvelope": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/Medal"
+          }
+        }
+      },
+      "MedalCollection": {
+        "type": "object",
+        "required": [
+          "data",
+          "links",
+          "meta"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Medal"
+            }
+          },
+          "links": {
+            "type": "object",
+            "properties": {
+              "first": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "last": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "prev": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "next": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          },
+          "meta": {
+            "type": "object",
+            "required": [
+              "current_page",
+              "last_page",
+              "per_page",
+              "total"
+            ],
+            "properties": {
+              "current_page": {
+                "type": "integer"
+              },
+              "last_page": {
+                "type": "integer"
+              },
+              "per_page": {
+                "type": "integer"
+              },
+              "total": {
+                "type": "integer"
+              }
+            }
+          }
+        }
+      },
+      "MedalRecipient": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name",
+          "role"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "name": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "Administrator",
+              "Coach",
+              "Student"
+            ]
+          }
+        }
+      },
+      "MedalRecipientCollection": {
+        "type": "object",
+        "required": [
+          "data",
+          "links",
+          "meta"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MedalRecipient"
+            }
+          },
+          "links": {
+            "type": "object",
+            "properties": {
+              "first": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "last": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "prev": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "next": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          },
+          "meta": {
+            "type": "object",
+            "required": [
+              "current_page",
+              "last_page",
+              "per_page",
+              "total"
+            ],
+            "properties": {
+              "current_page": {
+                "type": "integer"
+              },
+              "last_page": {
+                "type": "integer"
+              },
+              "per_page": {
+                "type": "integer"
+              },
+              "total": {
+                "type": "integer"
+              }
+            }
+          }
+        }
+      },
+      "StoreMedalInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "specialty_id"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "Recortado y único dentro de su especialidad."
+          },
+          "specialty_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Especialidad existente, usada como juego o materia."
+          }
+        }
+      },
+      "StoreMedalMultipartInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "specialty_id"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "Recortado y único dentro de su especialidad."
+          },
+          "specialty_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Especialidad existente, usada como juego o materia."
+          },
+          "image": {
+            "type": "string",
+            "format": "binary",
+            "description": "Opcional: JPG, PNG o WebP; máximo 1024 KiB y máximos independientes de 512 píxeles de ancho y alto. Sin SVG/GIF."
+          }
+        }
       }
     },
     "responses": {
@@ -3632,6 +5354,47 @@
             "example": {
               "error": "Not Found",
               "code": 404
+            }
+          }
+        }
+      },
+      "ProfileSaveCooldown": {
+        "description": "Tras tres guardados efectivos por cuenta, pausa de 60 segundos. Persistente entre sesiones y recargas. Los errores y envíos sin cambios no consumen ni reinician el bloque. Al vencer comienza un bloque nuevo. No se guardan datos ni archivos durante un bloqueo.",
+        "headers": {
+          "Retry-After": {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 60
+            },
+            "description": "Segundos restantes, calculados por el servidor."
+          },
+          "Cache-Control": {
+            "schema": {
+              "type": "string",
+              "const": "no-store, private"
+            }
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ProfileSaveCooldownError"
+            },
+            "example": {
+              "error": "Too Many Requests",
+              "code": 429,
+              "retry_after": 60
+            }
+          }
+        }
+      },
+      "EnrollmentNotFound": {
+        "description": "Inscripción no encontrada.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiError"
             }
           }
         }

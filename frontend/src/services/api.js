@@ -8,6 +8,7 @@ export class ApiError extends Error {
     super(data.error || 'Request failed')
     this.status = status
     this.errors = data.errors || {}
+    this.retryAfter = Math.max(0, Number(data.retry_after) || 0)
   }
 }
 
