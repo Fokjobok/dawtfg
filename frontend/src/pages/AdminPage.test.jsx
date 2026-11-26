@@ -12,6 +12,7 @@ import AdminPage from './AdminPage.jsx'
 import EditUserForm from '../components/EditUserForm.jsx'
 import ToastProvider from '../components/ToastProvider.jsx'
 import { getMedalOptions } from '../services/medals.js'
+import { getCategoryOptions } from '../services/categories.js'
 import { getSession } from '../services/auth.js'
 import { getUsers, updateUser } from '../services/users.js'
 
@@ -21,6 +22,7 @@ vi.mock('../services/users.js', () => ({
   updateUser: vi.fn(),
 }))
 vi.mock('../services/medals.js', () => ({ getMedalOptions: vi.fn() }))
+vi.mock('../services/categories.js', () => ({ getCategoryOptions: vi.fn() }))
 
 const admin = { id: 1, name: 'Admin', role: 'Administrator' }
 const coach = {
@@ -41,6 +43,7 @@ beforeEach(() => {
   getSession.mockResolvedValue(admin)
   getUsers.mockResolvedValue({ data: [coach] })
   getMedalOptions.mockResolvedValue({ medals: [], specialties: [], users: [] })
+  getCategoryOptions.mockResolvedValue({ categories: [], specialties: [] })
 })
 
 afterEach(cleanup)

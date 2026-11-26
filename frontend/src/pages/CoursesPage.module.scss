@@ -44,3 +44,14 @@
     min-height: 2.75rem;
   }
 }
+
+.filters {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
+  margin-block: var(--space-6) var(--space-8);
+
+  @include mixins.desktop {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}

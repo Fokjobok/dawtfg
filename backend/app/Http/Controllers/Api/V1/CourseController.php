@@ -29,6 +29,7 @@ class CourseController extends Controller
         $filters = $input['filter'] ?? [];
 
         return PublicCourseResource::collection(Course::publiclyVisible()
+            ->when(isset($filters['category_id']), fn ($query) => $query->whereHas('specialty', fn ($specialty) => $specialty->where('category_id', $filters['category_id'])))
             ->when(isset($filters['specialty_id']), fn ($query) => $query->where('specialty_id', $filters['specialty_id']))
             ->when(isset($filters['level']), fn ($query) => $query->where('level', $filters['level']))
             ->with(['specialty:id,name', 'coach:id,name,avatar_path,is_private,medals_is_private', 'coach.medals.specialty:id,name'])->orderByDesc('id')

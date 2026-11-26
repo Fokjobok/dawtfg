@@ -3,6 +3,7 @@ import Button from './Button.jsx'
 import FormField from './FormField.jsx'
 
 import { useToasts } from './ToastProvider.jsx'
+
 import {
   assignMedal,
   createMedal,
@@ -10,6 +11,8 @@ import {
   getUserMedals,
   revokeMedal,
 } from '../services/medals.js'
+import MedalPicker from './MedalPicker.jsx'
+
 import styles from './MedalPanel.module.scss'
 
 export default function MedalPanel() {
@@ -27,6 +30,7 @@ export default function MedalPanel() {
 
   const [userId, setUserId] = useState('')
   const [medalId, setMedalId] = useState('')
+  const [medalRefresh, setMedalRefresh] = useState(0)
   const [ownedIds, setOwnedIds] = useState([])
   const [assignmentsStatus, setAssignmentsStatus] = useState('idle')
 
@@ -99,24 +103,19 @@ export default function MedalPanel() {
     event.preventDefault()
 
     perform(async () => {
-      const created = await createMedal({
+      await createMedal({
         name: name.trim(),
         specialty_id: Number(specialtyId),
         image,
       })
 
-      setOptions((current) => ({
-        ...current,
-        medals: [...current.medals, created].sort(
-          (a, b) => a.name.localeCompare(b.name) || a.id - b.id,
-        ),
-      }))
-
       setName('')
       setSpecialtyId('')
       setImage(null)
       setImageKey((current) => current + 1)
-      setMedalId(String(created.id))
+
+      setMedalId('')
+      setMedalRefresh((current) => current + 1)
     }, 'Medalla creada correctamente.')
   }
 
@@ -251,22 +250,14 @@ export default function MedalPanel() {
               ))}
             </FormField>
 
-            <FormField
-              as="select"
-              id="assigned-medal"
-              label="Medalla"
+            <MedalPicker
+              specialties={options.specialties}
               value={medalId}
-              onChange={(event) => setMedalId(event.target.value)}
-              required
-            >
-              <option value="">Selecciona una medalla</option>
-              {options.medals.map((medal) => (
-                <option key={medal.id} value={medal.id}>
-                  {medal.name} — {medal.specialty.name}
-                  {ownedIds.includes(medal.id) ? ' — asignada' : ''}
-                </option>
-              ))}
-            </FormField>
+              onChange={setMedalId}
+              ownedIds={ownedIds}
+              disabled={busy}
+              refreshKey={medalRefresh}
+            />
 
             {assignmentsStatus === 'loading' && (
               <p role="status">Consultando medallas del usuario…</p>

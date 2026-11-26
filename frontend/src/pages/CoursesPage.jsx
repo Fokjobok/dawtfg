@@ -7,7 +7,9 @@ import FormField from '../components/FormField.jsx'
 
 import { useToasts } from '../components/ToastProvider.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
+
 import { getCourses } from '../services/courses.js'
+import { getCatalogOptions } from '../services/categories.js'
 
 import {
   enrollInCourse,
@@ -28,6 +30,16 @@ export default function CoursesPage() {
   const [pagination, setPagination] = useState(null)
   const [status, setStatus] = useState('loading')
   const [level, setLevel] = useState('')
+
+  const [categoryId, setCategoryId] = useState('')
+  const [specialtyId, setSpecialtyId] = useState('')
+  const [options, setOptions] = useState({
+    categories: [],
+    specialties: [],
+  })
+  const [optionsStatus, setOptionsStatus] = useState('loading')
+  const [optionsReload, setOptionsReload] = useState(0)
+
   const [enrollments, setEnrollments] = useState({})
   const [enrollmentStatus, setEnrollmentStatus] = useState('idle')
   const [pendingCourseId, setPendingCourseId] = useState(null)
@@ -37,7 +49,11 @@ export default function CoursesPage() {
 
     async function loadCourses() {
       try {
-        const response = await getCourses(page, { level })
+        const response = await getCourses(page, {
+          level,
+          category_id: categoryId,
+          specialty_id: specialtyId,
+        })
         if (!active) return
 
         let ownEnrollments = {}
@@ -76,7 +92,26 @@ export default function CoursesPage() {
     return () => {
       active = false
     }
-  }, [page, level, isStudent, userId])
+  }, [page, level, categoryId, specialtyId, isStudent, userId])
+
+  useEffect(() => {
+    let active = true
+
+    getCatalogOptions()
+      .then((result) => {
+        if (!active) return
+
+        setOptions(result)
+        setOptionsStatus('ready')
+      })
+      .catch(() => {
+        if (active) setOptionsStatus('error')
+      })
+
+    return () => {
+      active = false
+    }
+  }, [optionsReload])
 
   function handleLevelChange(event) {
     if (pendingCourseId !== null) return
@@ -87,6 +122,27 @@ export default function CoursesPage() {
     setStatus('loading')
     setPage(1)
     setLevel(nextLevel)
+  }
+
+  function handleCategoryChange(event) {
+    const value = event.target.value
+
+    if (pendingCourseId !== null || value === categoryId) return
+
+    setStatus('loading')
+    setPage(1)
+    setCategoryId(value)
+    setSpecialtyId('')
+  }
+
+  function handleSpecialtyChange(event) {
+    const value = event.target.value
+
+    if (pendingCourseId !== null || value === specialtyId) return
+
+    setStatus('loading')
+    setPage(1)
+    setSpecialtyId(value)
   }
 
   function changePage(nextPage) {
@@ -155,6 +211,11 @@ export default function CoursesPage() {
     }
   }
 
+  const availableSpecialties = options.specialties.filter(
+    (specialty) =>
+      !categoryId || String(specialty.category?.id ?? '') === categoryId,
+  )
+
   return (
     <section
       aria-labelledby="courses-title"
@@ -166,19 +227,72 @@ export default function CoursesPage() {
         Descubre nuestros cursos y encuentra lo que quieres aprender.
       </p>
 
-      <FormField
-        as="select"
-        id="filter-level"
-        label="Nivel"
-        value={level}
-        onChange={handleLevelChange}
-        disabled={pendingCourseId !== null}
-      >
-        <option value="">Todos los niveles</option>
-        <option value="beginner">Principiante</option>
-        <option value="advanced">Avanzado</option>
-        <option value="expert">Experto</option>
-      </FormField>
+      <div className={styles.filters}>
+        <FormField
+          as="select"
+          id="filter-category"
+          label="Categoría"
+          value={categoryId}
+          onChange={handleCategoryChange}
+          disabled={pendingCourseId !== null || optionsStatus !== 'ready'}
+        >
+          <option value="">Todas las categorías</option>
+          {options.categories.map((category) => (
+            <option key={category.id} value={category.id}>
+              {category.name}
+            </option>
+          ))}
+        </FormField>
+
+        <FormField
+          as="select"
+          id="filter-specialty"
+          label="Videojuego o materia"
+          value={specialtyId}
+          onChange={handleSpecialtyChange}
+          disabled={pendingCourseId !== null || optionsStatus !== 'ready'}
+        >
+          <option value="">Todos los videojuegos o materias</option>
+          {availableSpecialties.map((specialty) => (
+            <option key={specialty.id} value={specialty.id}>
+              {specialty.name}
+            </option>
+          ))}
+        </FormField>
+
+        <FormField
+          as="select"
+          id="filter-level"
+          label="Nivel"
+          value={level}
+          onChange={handleLevelChange}
+          disabled={pendingCourseId !== null}
+        >
+          <option value="">Todos los niveles</option>
+          <option value="beginner">Principiante</option>
+          <option value="advanced">Avanzado</option>
+          <option value="expert">Experto</option>
+        </FormField>
+      </div>
+
+      {optionsStatus === 'loading' && (
+        <p role="status">Cargando categorías y materias…</p>
+      )}
+
+      {optionsStatus === 'error' && (
+        <div>
+          <p role="alert">No se pudieron cargar las categorías y materias.</p>
+          <Button
+            disabled={pendingCourseId !== null}
+            onClick={() => {
+              setOptionsStatus('loading')
+              setOptionsReload((current) => current + 1)
+            }}
+          >
+            Reintentar filtros
+          </Button>
+        </div>
+      )}
 
       {status === 'loading' && <p role="status">Cargando cursos…</p>}
 
@@ -199,8 +313,8 @@ export default function CoursesPage() {
 
           {courses.length === 0 ? (
             <p>
-              {level
-                ? 'No hay cursos con el nivel seleccionado.'
+              {categoryId || specialtyId || level
+                ? 'No hay cursos que coincidan con los filtros.'
                 : 'Todavía no hay cursos publicados.'}
             </p>
           ) : (

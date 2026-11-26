@@ -47,6 +47,8 @@ it('sends avatars as multipart with method override and 0/1 privacy without losi
     is_private: false,
     bio_is_private: true,
     medals_is_private: true,
+    enrollments_is_private: true,
+    featured_course_ids: [7, 3],
     avatar,
   })
   const [url, request] = fetch.mock.calls[1]
@@ -57,6 +59,8 @@ it('sends avatars as multipart with method override and 0/1 privacy without losi
   expect(request.body.get('is_private')).toBe('0')
   expect(request.body.get('bio_is_private')).toBe('1')
   expect(request.body.get('medals_is_private')).toBe('1')
+  expect(request.body.get('enrollments_is_private')).toBe('1')
+  expect(JSON.parse(request.body.get('featured_course_ids'))).toEqual([7, 3])
   expect(request.body.get('bio')).toBe('')
   expect(request.body.get('avatar').name).toBe('avatar.png')
   expect(request.headers['Content-Type']).toBeUndefined()

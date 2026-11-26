@@ -11,6 +11,8 @@ import { ROLE_LABELS } from '../roles.js'
 
 import MedalPanel from '../components/MedalPanel.jsx'
 
+import CategoryPanel from '../components/CategoryPanel.jsx'
+
 export default function AdminPage() {
   const [user, setUser] = useState(null)
   const [sessionStatus, setSessionStatus] = useState('loading')
@@ -169,6 +171,7 @@ export default function AdminPage() {
         />
       )}
 
+      <CategoryPanel />
       <MedalPanel />
     </section>
   )

@@ -1,10 +1,18 @@
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import CoursesPage from './CoursesPage.jsx'
 import ToastProvider from '../components/ToastProvider.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import { getCourses } from '../services/courses.js'
+import { getCatalogOptions } from '../services/categories.js'
 import {
   enrollInCourse,
   getEnrollments,
@@ -13,6 +21,7 @@ import {
 
 vi.mock('../context/AuthContext.jsx', () => ({ useAuth: vi.fn() }))
 vi.mock('../services/courses.js', () => ({ getCourses: vi.fn() }))
+vi.mock('../services/categories.js', () => ({ getCatalogOptions: vi.fn() }))
 vi.mock('../services/enrollments.js', () => ({
   enrollInCourse: vi.fn(),
   getEnrollments: vi.fn(),
@@ -59,11 +68,97 @@ beforeEach(() => {
   useAuth.mockReturnValue({ user: null, status: 'ready' })
   getCourses.mockResolvedValue(response([course(1), course(2, '19.90')]))
   getEnrollments.mockResolvedValue({ data: [] })
+  getCatalogOptions.mockResolvedValue({
+    categories: [
+      { id: 1, name: 'Videojuegos' },
+      { id: 2, name: 'Asignaturas' },
+    ],
+    specialties: [
+      {
+        id: 1,
+        name: 'Counter Strike',
+        category: { id: 1, name: 'Videojuegos' },
+      },
+      { id: 2, name: 'Matemáticas', category: { id: 2, name: 'Asignaturas' } },
+    ],
+  })
 })
 
 afterEach(() => {
   cleanup()
   vi.restoreAllMocks()
+})
+
+it('combines category, specialty and level, clears incompatible specialties and resets the page', async () => {
+  getCourses.mockResolvedValue(response([course(1)], 1, 2))
+  openPage()
+  await screen.findByRole('heading', { name: 'Course 1' })
+  fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }))
+  await waitFor(() =>
+    expect(getCourses).toHaveBeenLastCalledWith(2, {
+      level: '',
+      category_id: '',
+      specialty_id: '',
+    }),
+  )
+  fireEvent.change(screen.getByLabelText('Categoría'), {
+    target: { value: '1' },
+  })
+  expect(
+    screen.getByLabelText('Videojuego o materia').textContent,
+  ).not.toContain('Matemáticas')
+  fireEvent.change(screen.getByLabelText('Videojuego o materia'), {
+    target: { value: '1' },
+  })
+  fireEvent.change(screen.getByLabelText('Nivel'), {
+    target: { value: 'advanced' },
+  })
+  await waitFor(() =>
+    expect(getCourses).toHaveBeenLastCalledWith(1, {
+      level: 'advanced',
+      category_id: '1',
+      specialty_id: '1',
+    }),
+  )
+  fireEvent.change(screen.getByLabelText('Categoría'), {
+    target: { value: '2' },
+  })
+  expect(screen.getByLabelText('Videojuego o materia').value).toBe('')
+  expect(
+    screen.getByLabelText('Videojuego o materia').textContent,
+  ).not.toContain('Counter Strike')
+  await waitFor(() =>
+    expect(getCourses).toHaveBeenLastCalledWith(1, {
+      level: 'advanced',
+      category_id: '2',
+      specialty_id: '',
+    }),
+  )
+  fireEvent.change(screen.getByLabelText('Categoría'), {
+    target: { value: '' },
+  })
+  fireEvent.change(screen.getByLabelText('Nivel'), { target: { value: '' } })
+  await waitFor(() =>
+    expect(getCourses).toHaveBeenLastCalledWith(1, {
+      level: '',
+      category_id: '',
+      specialty_id: '',
+    }),
+  )
+})
+
+it('keeps the catalog usable when filter options fail and lets the visitor retry them', async () => {
+  getCatalogOptions.mockRejectedValueOnce(new Error('Unavailable'))
+  openPage()
+  await screen.findByRole('heading', { name: 'Course 1' })
+  fireEvent.click(
+    await screen.findByRole('button', { name: 'Reintentar filtros' }),
+  )
+  await waitFor(() =>
+    expect(screen.getByLabelText('Categoría').disabled).toBe(false),
+  )
+  expect(getCatalogOptions).toHaveBeenCalledTimes(2)
+  expect(getEnrollments).not.toHaveBeenCalled()
 })
 
 it('shows visitors the catalog and a login link for free courses without requesting private data', async () => {
@@ -215,9 +310,9 @@ it('resets pagination when filtering and requests private states only for each c
   })
   await screen.findByRole('heading', { name: 'Course 4' })
   expect(getCourses.mock.calls).toEqual([
-    [1, { level: '' }],
-    [2, { level: '' }],
-    [1, { level: 'expert' }],
+    [1, { level: '', category_id: '', specialty_id: '' }],
+    [2, { level: '', category_id: '', specialty_id: '' }],
+    [1, { level: 'expert', category_id: '', specialty_id: '' }],
   ])
   expect(getEnrollments.mock.calls).toEqual([[[1, 2]], [[3]], [[4]]])
 })

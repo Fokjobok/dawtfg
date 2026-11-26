@@ -53,6 +53,10 @@ export async function getCourses(page = 1, filters = {}) {
     params.set('filter[specialty_id]', String(filters.specialty_id))
   }
 
+  if (filters.category_id) {
+    params.set('filter[category_id]', String(filters.category_id))
+  }
+
   return apiRequest(`/courses?${params}`)
 }
 

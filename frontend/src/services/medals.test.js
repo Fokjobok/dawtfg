@@ -3,6 +3,7 @@ import {
   assignMedal,
   createMedal,
   getMedalOptions,
+  getMedals,
   getUserMedals,
   revokeMedal,
 } from './medals.js'
@@ -20,16 +21,30 @@ it('loads all pages of options and account assignments without mixing their resp
     })
   })
   const options = await getMedalOptions()
-  expect(options.medals).toEqual([
-    { id: 1, source: '/api/v1/medals' },
-    { id: 2, source: '/api/v1/medals' },
-  ])
+  expect(Object.hasOwn(options, 'medals')).toBe(false)
   expect(options.users[1].source).toBe('/api/v1/medal-recipients')
   expect(options.specialties[1].source).toBe('/api/v1/specialties')
   const medals = await getUserMedals(9)
   expect(medals).toHaveLength(2)
   expect(medals[1].source).toBe('/api/v1/users/9/medals')
-  expect(fetch).toHaveBeenCalledTimes(8)
+  expect(fetch).toHaveBeenCalledTimes(6)
+  expect(
+    fetch.mock.calls.some(
+      ([url]) =>
+        new URL(url, 'https://example.test').pathname === '/api/v1/medals',
+    ),
+  ).toBe(false)
+})
+
+it('requests only the selected category and page of medals', async () => {
+  const response = { data: [{ id: 7 }], meta: { last_page: 3 } }
+  fetch.mockResolvedValueOnce(Response.json(response))
+  expect(await getMedals(3, 2)).toEqual(response)
+  const url = new URL(fetch.mock.calls[0][0], 'https://example.test')
+  expect(url.searchParams.get('filter[specialty_id]')).toBe('3')
+  expect(url.searchParams.get('page')).toBe('2')
+  expect(url.searchParams.get('per_page')).toBe('20')
+  expect(fetch).toHaveBeenCalledTimes(1)
 })
 
 it.each([false, true])(

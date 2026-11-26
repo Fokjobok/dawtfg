@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\V1\CategoryController;
 use App\Http\Controllers\Api\V1\CourseController;
 use App\Http\Controllers\Api\V1\EnrollmentController;
 use App\Http\Controllers\Api\V1\MedalController;
@@ -12,6 +13,9 @@ use Illuminate\Support\Facades\Route;
 
 // The web group resolves SPA sessions even without Origin and protects mutations with CSRF.
 Route::prefix('api/v1')->group(function (): void {
+    Route::get('categories', [CategoryController::class, 'index'])->middleware('auth:sanctum')->name('api.v1.categories.index');
+    Route::post('categories', [CategoryController::class, 'store'])->middleware('auth:sanctum')->name('api.v1.categories.store');
+    Route::patch('specialties/{specialty}', [SpecialtyController::class, 'updateCategory'])->whereNumber('specialty')->middleware('auth:sanctum')->name('api.v1.specialties.updateCategory');
     Route::middleware('auth:sanctum')->group(function (): void {
         Route::get('medals', [MedalController::class, 'index'])->name('api.v1.medals.index');
         Route::get('medal-recipients', [MedalController::class, 'recipients'])->name('api.v1.medals.recipients');

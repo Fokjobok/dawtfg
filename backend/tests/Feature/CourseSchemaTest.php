@@ -28,6 +28,8 @@ final class CourseSchemaTest extends TestCase
         $categories = require database_path('migrations/2026_11_15_000001_create_categories_table.php');
         $rename = require database_path('migrations/2026_11_15_000003_rename_categories_to_specialties.php');
         $memberships = require database_path('migrations/2026_11_15_000004_create_coach_specialty_table.php');
+        $hierarchy = require database_path('migrations/2026_11_25_000001_create_category_hierarchy.php');
+        $hierarchy->down();
         // Roll back the newer specialty dependency before recreating the historical schema.
         $medals = require database_path('migrations/2026_11_24_000001_create_medals_tables.php');
         $medals->down();
@@ -67,6 +69,7 @@ final class CourseSchemaTest extends TestCase
         $rename->up();
         $memberships->up();
         $medals->up();
+        $hierarchy->up();
     }
 
     public function test_a_course_can_reference_a_coach_and_specialty_with_a_price(): void

@@ -13,6 +13,7 @@ import {
   assignMedal,
   createMedal,
   getMedalOptions,
+  getMedals,
   getUserMedals,
   revokeMedal,
 } from '../services/medals.js'
@@ -21,6 +22,7 @@ vi.mock('../services/medals.js', () => ({
   assignMedal: vi.fn(),
   createMedal: vi.fn(),
   getMedalOptions: vi.fn(),
+  getMedals: vi.fn(),
   getUserMedals: vi.fn(),
   revokeMedal: vi.fn(),
 }))
@@ -28,7 +30,6 @@ vi.mock('../services/medals.js', () => ({
 const specialty = { id: 3, name: 'Tarkov' }
 const medal = { id: 7, name: 'Tactics', specialty, image_url: null }
 const options = {
-  medals: [medal],
   specialties: [specialty],
   users: [
     { id: 1, name: 'Administrator', role: 'Administrator' },
@@ -40,6 +41,7 @@ const options = {
 beforeEach(() => {
   vi.resetAllMocks()
   getMedalOptions.mockResolvedValue(options)
+  getMedals.mockResolvedValue({ data: [medal], meta: { last_page: 1 } })
   getUserMedals.mockResolvedValue([])
   assignMedal.mockResolvedValue(undefined)
   revokeMedal.mockResolvedValue(undefined)
@@ -55,7 +57,11 @@ function openPanel() {
   )
 }
 
-function selectMedal() {
+async function selectMedal() {
+  fireEvent.change(screen.getByLabelText('Categoría de la medalla'), {
+    target: { value: '3' },
+  })
+  await screen.findByRole('option', { name: /Tactics/ })
   fireEvent.change(screen.getByLabelText('Medalla'), {
     target: { value: '7' },
   })
@@ -100,7 +106,13 @@ it.each([false, true])(
     })
     expect(screen.getByLabelText('Nombre de la medalla').value).toBe('')
     expect(screen.getByLabelText('Imagen opcional').files.length).toBe(0)
-    expect(screen.getByLabelText('Medalla').value).toBe('8')
+    expect(screen.getByLabelText('Medalla').value).toBe('')
+    expect(getMedals).not.toHaveBeenCalled()
+    getMedals.mockResolvedValueOnce({ data: [created], meta: { last_page: 1 } })
+    fireEvent.change(screen.getByLabelText('Categoría de la medalla'), {
+      target: { value: '3' },
+    })
+    await screen.findByRole('option', { name: 'New medal' })
     expect(assignMedal).not.toHaveBeenCalled()
   },
 )
@@ -115,7 +127,7 @@ it('assigns to any selected account and updates buttons after confirmed assignme
     '9',
   ])
   fireEvent.change(user, { target: { value: '1' } })
-  selectMedal()
+  await selectMedal()
   const assign = screen.getByRole('button', { name: 'Asignar' })
   const revoke = screen.getByRole('button', { name: 'Retirar' })
   await waitFor(() => expect(assign.disabled).toBe(false))
@@ -144,7 +156,7 @@ it('ignores an old account response after selecting a different recipient', asyn
   openPanel()
   const user = await screen.findByLabelText('Usuario')
   fireEvent.change(user, { target: { value: '1' } })
-  selectMedal()
+  await selectMedal()
   fireEvent.change(user, { target: { value: '9' } })
   const revoke = screen.getByRole('button', { name: 'Retirar' })
   await waitFor(() => expect(revoke.disabled).toBe(false))
@@ -178,7 +190,7 @@ it('blocks actions when assignments cannot be loaded and does not confirm a fail
   openPanel()
   const user = await screen.findByLabelText('Usuario')
   fireEvent.change(user, { target: { value: '1' } })
-  selectMedal()
+  await selectMedal()
   await screen.findByText(/No se pudieron consultar las medallas/)
   expect(screen.getByRole('button', { name: 'Asignar' }).disabled).toBe(true)
   expect(screen.getByRole('button', { name: 'Retirar' }).disabled).toBe(true)
@@ -200,7 +212,7 @@ it('blocks duplicate requests and changes to the recipient while an assignment i
   openPanel()
   const user = await screen.findByLabelText('Usuario')
   fireEvent.change(user, { target: { value: '2' } })
-  selectMedal()
+  await selectMedal()
   const assign = screen.getByRole('button', { name: 'Asignar' })
   await waitFor(() => expect(assign.disabled).toBe(false))
   fireEvent.click(assign)

@@ -4,7 +4,7 @@ El modelo organiza los cursos por especialidad y relaciona cada Coach con las ma
 
 ## Tablas y decisiones
 
-`specialties`: `id`, `name` (texto de hasta 100 caracteres, único), `created_at` y `updated_at`. Una especialidad puede agrupar varios cursos; cada curso tiene como máximo una especialidad. Se renombra la tabla anterior `categories` conservando filas e identificadores. No hay una categoría general adicional.
+`specialties`: `id`, `name` (texto de hasta 100 caracteres, único), `created_at` y `updated_at`. Una especialidad puede agrupar varios cursos; cada curso tiene como máximo una especialidad. Se renombra la tabla anterior `categories` conservando filas e identificadores. La jerarquía superior añadida posteriormente se describe en Categorías administrables; no modifica los identificadores de especialidades.
 
 `coach_specialty`: `coach_id` a `users.id` y `specialty_id` a `specialties.id`, con clave primaria compuesta para impedir asociaciones repetidas e índice por especialidad para buscar sus Coaches. Un Coach puede tener varias especialidades y cada especialidad varios Coaches. Al eliminar un usuario o especialidad sin cursos que lo impidan se eliminan sus asociaciones, sin borrar el otro extremo. No se añadieron datos de ejemplo ni se asignaron especialidades a las cuentas existentes.
 
@@ -32,6 +32,13 @@ Relaciones Eloquent utilizadas en pruebas: `User::specialties()`, `Specialty::co
 erDiagram
     USERS o|--o{ COURSES : coach_id
     SPECIALTIES o|--o{ COURSES : specialty_id
+    SPECIALTY_CATEGORIES o|--o{ SPECIALTIES : category_id
+    SPECIALTY_CATEGORIES {
+        bigint id PK
+        string name UK
+        timestamp created_at
+        timestamp updated_at
+    }
     USERS ||--o{ COACH_SPECIALTY : coach_id
     SPECIALTIES ||--o{ COACH_SPECIALTY : specialty_id
     COURSES ||--o{ COURSE_COACH : course_id
@@ -205,3 +212,12 @@ medals contiene id, name (100), specialty_id obligatorio, image_path nullable y 
 medal_user relaciona N:M usuarios y medallas mediante PK compuesta user_id/medal_id y timestamps, con índice por medalla. Cualquier rol puede recibir varias medallas de varias especialidades; no se exige pertenecer a la especialidad porque también reciben estudiantes. FK en cascada eliminan asociaciones al desaparecer cualquiera de los extremos, sin borrar el otro extremo. La API de esta entrega crea definiciones y asigna/retira asociaciones; no incorpora edición/borrado de definiciones ni logros calculados.
 
 users.medals_is_private booleano false representa una sección real. La privacidad global prevalece; el propietario conserva lectura de todas sus medallas y su ajuste. En tarjetas públicas docentes se filtran por specialty_id del curso y se omiten por privacidad sin excepción de rol. Relaciones User::medals(), Medal::users(), Medal::specialty() y Specialty::medals(); carga relacionada en lote en catálogo/inscripciones/destacados. Asignaciones administrativas transaccionales e idempotentes con unicidad SQL, sin consumir guardados del perfil.
+
+
+## Categorías administrables
+
+specialty_categories agrupa los juegos o materias existentes (specialties), por ejemplo Videojuegos -> Counter Strike 2 y Asignaturas -> Matemáticas. Modelo Category con nombre único de hasta 100 y timestamps; cada especialidad recibe category_id nullable, FK de borrado restringido e índice. La tabla usa un nombre distinto de categories para evitar colisiones con índices/constraints conservados por el renombrado histórico categories -> specialties. No se recuperan ni duplican los antiguos grupos: los ID, docentes, medallas y cursos mantienen sus asociaciones originales.
+
+Categoría 1:N especialidades; especialidad 1:N cursos. El curso obtiene su categoría a través de su especialidad, sin duplicar category_id en courses ni alterar nivel/precio/permisos. Categorías nuevas no clasifican automáticamente especialidades anteriores. Las no clasificadas permanecen en catálogo y opciones sin filtro. Administrator crea categorías y clasifica/reclasifica o deja sin clasificar una especialidad; Coach conserva sus grupos y Student no recibe permisos de gestión.
+
+Migración aditiva con FK inline e índice: SQLite puede retirar category_id sin reconstruir specialties, que está referenciada por cursos; PostgreSQL acepta las mismas sentencias. La reversión elimina clasificación/categorías y conserva especialidades/cursos. Las pruebas históricas retiran/reponen primero esta dependencia al ensayar la estructura antigua. Sin seed, clasificación automática o borrado de definiciones por API en este bloque.

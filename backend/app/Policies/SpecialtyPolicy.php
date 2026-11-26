@@ -18,6 +18,11 @@ class SpecialtyPolicy
         return $actor->role === UserRole::Administrator;
     }
 
+    public function updateCategory(User $actor, Specialty $specialty): bool
+    {
+        return $actor->role === UserRole::Administrator;
+    }
+
     public function viewCoaches(User $actor, Specialty $specialty): bool
     {
         return $actor->role === UserRole::Administrator

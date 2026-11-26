@@ -19,13 +19,12 @@ async function getAll(path) {
 }
 
 export async function getMedalOptions() {
-  const [medals, specialties, users] = await Promise.all([
-    getAll('/medals'),
+  const [specialties, users] = await Promise.all([
     getAll('/specialties'),
     getAll('/medal-recipients'),
   ])
 
-  return { medals, specialties, users }
+  return { specialties, users }
 }
 
 export function getUserMedals(userId) {
@@ -66,4 +65,14 @@ export async function revokeMedal(userId, medalId) {
   await apiRequest(`/users/${userId}/medals/${medalId}`, {
     method: 'DELETE',
   })
+}
+
+export function getMedals(specialtyId, page = 1) {
+  const params = new URLSearchParams({
+    'filter[specialty_id]': String(specialtyId),
+    page: String(page),
+    per_page: '20',
+  })
+
+  return apiRequest(`/medals?${params}`)
 }

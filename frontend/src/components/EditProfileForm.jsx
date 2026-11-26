@@ -7,6 +7,8 @@ import { updateOwnProfile } from '../services/profiles.js'
 
 import styles from './EditProfileForm.module.scss'
 
+import { EnrolledCoursePicker } from './ProfileCourses.jsx'
+
 export default function EditProfileForm({ profile, onSaved }) {
   const { notify } = useToasts()
   const formRef = useRef(null)
@@ -21,6 +23,14 @@ export default function EditProfileForm({ profile, onSaved }) {
 
   const [medalsIsPrivate, setMedalsIsPrivate] = useState(
     profile.medals_is_private ?? false,
+  )
+
+  const [coursesIsPrivate, setCoursesIsPrivate] = useState(
+    profile.enrollments_is_private ?? false,
+  )
+
+  const [featuredIds, setFeaturedIds] = useState(
+    profile.featured_course_ids ?? [],
   )
 
   const [saving, setSaving] = useState(false)
@@ -46,6 +56,9 @@ export default function EditProfileForm({ profile, onSaved }) {
     isPrivate !== profile.is_private ||
     bioIsPrivate !== Boolean(profile.bio_is_private) ||
     medalsIsPrivate !== Boolean(profile.medals_is_private) ||
+    coursesIsPrivate !== Boolean(profile.enrollments_is_private) ||
+    JSON.stringify(featuredIds) !==
+      JSON.stringify(profile.featured_course_ids ?? []) ||
     avatar !== null ||
     (removeAvatar && Boolean(profile.avatar_url))
 
@@ -96,6 +109,8 @@ export default function EditProfileForm({ profile, onSaved }) {
         is_private: isPrivate,
         bio_is_private: bioIsPrivate,
         medals_is_private: medalsIsPrivate,
+        enrollments_is_private: coursesIsPrivate,
+        featured_course_ids: featuredIds,
         ...(avatar ? { avatar } : {}),
         ...(removeAvatar ? { remove_avatar: true } : {}),
       })
@@ -107,6 +122,9 @@ export default function EditProfileForm({ profile, onSaved }) {
       setIsPrivate(updated.is_private)
       setBioIsPrivate(updated.bio_is_private ?? false)
       setMedalsIsPrivate(updated.medals_is_private ?? false)
+
+      setCoursesIsPrivate(updated.enrollments_is_private ?? false)
+      setFeaturedIds(updated.featured_course_ids ?? [])
 
       setAvatar(null)
       setRemoveAvatar(false)
@@ -141,6 +159,14 @@ export default function EditProfileForm({ profile, onSaved }) {
       setSaving(false)
     }
   }
+
+  const featuredErrors = Object.entries(errors)
+    .filter(
+      ([field]) =>
+        field === 'featured_course_ids' ||
+        field.startsWith('featured_course_ids.'),
+    )
+    .flatMap((entry) => entry[1])
 
   return (
     <form
@@ -283,7 +309,35 @@ export default function EditProfileForm({ profile, onSaved }) {
             <option value="public">Públicas</option>
             <option value="private">Solo yo</option>
           </FormField>
+
+          <FormField
+            as="select"
+            id="profile-courses-visibility"
+            name="enrollments_is_private"
+            label="Visibilidad de los cursos destacados"
+            hint={
+              isPrivate
+                ? 'El perfil privado oculta esta sección. Se conserva tu preferencia.'
+                : 'Solo se mostrarán los cursos que elijas como destacados.'
+            }
+            value={coursesIsPrivate ? 'private' : 'public'}
+            onChange={(event) =>
+              setCoursesIsPrivate(event.target.value === 'private')
+            }
+            disabled={isPrivate}
+            errors={errors.enrollments_is_private}
+          >
+            <option value="public">Públicos</option>
+            <option value="private">Solo yo</option>
+          </FormField>
         </fieldset>
+
+        <EnrolledCoursePicker
+          selectedIds={featuredIds}
+          onChange={setFeaturedIds}
+          disabled={saving}
+          errors={featuredErrors}
+        />
 
         <div className={styles.actions}>
           <Button

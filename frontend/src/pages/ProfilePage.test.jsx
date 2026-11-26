@@ -1,4 +1,11 @@
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react'
 import { Link, MemoryRouter, Route, Routes } from 'react-router'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import ProfilePage from './ProfilePage.jsx'
@@ -6,6 +13,9 @@ import { getPublicProfile, updateOwnProfile } from '../services/profiles.js'
 import { AuthProvider } from '../context/AuthContext.jsx'
 import ToastProvider from '../components/ToastProvider.jsx'
 import { getSession } from '../services/auth.js'
+import { getEnrollmentPage } from '../services/enrollments.js'
+
+vi.mock('../services/enrollments.js', () => ({ getEnrollmentPage: vi.fn() }))
 
 vi.mock('../services/auth.js', () => ({ getSession: vi.fn() }))
 
@@ -57,6 +67,10 @@ function openProfile() {
 beforeEach(() => {
   vi.resetAllMocks()
   getSession.mockResolvedValue(null)
+  getEnrollmentPage.mockResolvedValue({
+    data: [],
+    meta: { current_page: 1, last_page: 1 },
+  })
 })
 afterEach(() => {
   cleanup()
@@ -70,6 +84,147 @@ it('announces loading while the profile is pending', () => {
     'status',
   )
   expect(getPublicProfile).toHaveBeenCalledWith('6')
+})
+
+function featuredCourse(id) {
+  return {
+    id,
+    title: `Featured course ${id}`,
+    cover_url: null,
+    specialty: { id: 1, name: 'Game' },
+    coach: { name: 'Coach' },
+  }
+}
+
+it('shows permitted featured courses to visitors even with a hidden biography without requesting private enrollments', async () => {
+  getPublicProfile.mockResolvedValue(
+    profile({ featured_courses: [featuredCourse(2), featuredCourse(1)] }),
+  )
+  openProfile()
+  await screen.findByRole('heading', { name: 'Cursos destacados' })
+  expect(
+    screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent),
+  ).toEqual(['Featured course 2', 'Featured course 1'])
+  expect(getEnrollmentPage).not.toHaveBeenCalled()
+  expect(screen.queryByRole('heading', { name: 'Tu privacidad' })).toBeNull()
+})
+
+it('saves selection and course privacy with the existing profile form and resets the dirty baseline', async () => {
+  const course = featuredCourse(4)
+  const own = profile({
+    can_edit: true,
+    featured_course_ids: [],
+    featured_courses: [],
+    enrollments_is_private: false,
+  })
+  getPublicProfile.mockResolvedValue(own)
+  getEnrollmentPage.mockResolvedValue({
+    data: [{ id: 31, course_id: 4, course }],
+    meta: { last_page: 1 },
+  })
+  updateOwnProfile.mockResolvedValue(
+    saveResponse({
+      ...own,
+      featured_course_ids: [4],
+      featured_courses: [course],
+      enrollments_is_private: true,
+    }),
+  )
+  openProfile()
+  fireEvent.click(
+    await screen.findByRole('checkbox', { name: /Featured course 4/ }),
+  )
+  fireEvent.change(
+    screen.getByLabelText('Visibilidad de los cursos destacados'),
+    { target: { value: 'private' } },
+  )
+  const save = screen.getByRole('button', { name: 'Guardar cambios' })
+  expect(save.disabled).toBe(false)
+  fireEvent.click(save)
+  await screen.findByText('Perfil actualizado correctamente.')
+  expect(updateOwnProfile).toHaveBeenCalledExactlyOnceWith({
+    name: own.name,
+    bio: null,
+    is_private: false,
+    bio_is_private: false,
+    medals_is_private: false,
+    enrollments_is_private: true,
+    featured_course_ids: [4],
+  })
+  expect(save.disabled).toBe(true)
+  expect(
+    screen.getByRole('heading', { name: 'Featured course 4' }),
+  ).toBeTruthy()
+})
+
+it('preserves the entered selection and focuses the group when a featured ID fails validation', async () => {
+  getPublicProfile.mockResolvedValue(
+    profile({ can_edit: true, featured_course_ids: [4] }),
+  )
+  updateOwnProfile.mockRejectedValue({
+    status: 422,
+    errors: { 'featured_course_ids.0': ['Choose your own courses.'] },
+  })
+  openProfile()
+  fireEvent.change(await screen.findByLabelText('Nombre'), {
+    target: { value: 'Pending name' },
+  })
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+  await screen.findByText('Choose your own courses.')
+  const group = screen.getByRole('group', { name: 'Mis cursos y destacados' })
+  await waitFor(() => expect(document.activeElement).toBe(group))
+  expect(
+    screen.getByRole('button', { name: 'Quitar curso 4 de destacados' }),
+  ).toBeTruthy()
+})
+
+it('keeps permitted medal groups inside the profile card even when the biography is hidden', async () => {
+  getPublicProfile.mockResolvedValue(
+    profile({
+      medals: [
+        {
+          id: 1,
+          name: 'Tactics',
+          specialty: { id: 2, name: 'Counter Strike' },
+          image_url: null,
+        },
+      ],
+    }),
+  )
+  openProfile()
+  const medals = await screen.findByRole('region', { name: 'Medallas' })
+  const card = screen
+    .getByRole('heading', { name: 'Public student' })
+    .closest('header').parentElement
+  expect(card.contains(medals)).toBe(true)
+  expect(screen.getByText('Tactics')).toBeTruthy()
+  expect(screen.queryByRole('heading', { name: 'Biografía' })).toBeNull()
+})
+
+it('omits the medal section when the API hides it but preserves the owner view of private medals', async () => {
+  getPublicProfile.mockResolvedValueOnce(profile({ is_private: true }))
+  const { unmount } = openProfile()
+  await screen.findByRole('heading', { name: 'Public student' })
+  expect(screen.queryByRole('heading', { name: 'Medallas' })).toBeNull()
+  unmount()
+  getPublicProfile.mockResolvedValueOnce(
+    profile({
+      can_edit: true,
+      is_private: true,
+      medals_is_private: true,
+      medals: [
+        {
+          id: 1,
+          name: 'Private medal',
+          specialty: { id: 2, name: 'Counter Strike' },
+          image_url: null,
+        },
+      ],
+    }),
+  )
+  openProfile()
+  await screen.findByRole('heading', { name: 'Medallas' })
+  expect(screen.getByText('Private medal')).toBeTruthy()
 })
 
 it('shows the public avatar, name, level and permitted biography', async () => {
@@ -188,6 +343,8 @@ it('updates the profile heading after the owner saves a name', async () => {
     is_private: false,
     bio_is_private: false,
     medals_is_private: false,
+    enrollments_is_private: false,
+    featured_course_ids: [],
   })
   expect(screen.getByText('Perfil actualizado correctamente.')).toBeTruthy()
 })
@@ -243,6 +400,8 @@ it('retains the section preference when switching global privacy and saves boole
     is_private: true,
     bio_is_private: true,
     medals_is_private: false,
+    enrollments_is_private: false,
+    featured_course_ids: [],
   })
   expect(screen.getByText('Tu perfil es privado.')).toBeTruthy()
   expect(screen.getByRole('textbox', { name: 'Biografía' }).value).toBe(
@@ -280,6 +439,8 @@ it('saves an edited biography with independent section privacy and updates the v
     is_private: false,
     bio_is_private: true,
     medals_is_private: false,
+    enrollments_is_private: false,
+    featured_course_ids: [],
   })
   expect(screen.getByText('Updated biography.', { selector: 'p' })).toBeTruthy()
   expect(screen.getByLabelText('Visibilidad de la biografía').value).toBe(
@@ -313,6 +474,8 @@ it('updates the displayed avatar and clears the file selection after a successfu
     bio_is_private: false,
     avatar: file,
     medals_is_private: false,
+    enrollments_is_private: false,
+    featured_course_ids: [],
   })
   expect(
     screen
@@ -350,6 +513,8 @@ it('discards a selected replacement when the owner chooses avatar removal', asyn
     bio_is_private: false,
     remove_avatar: true,
     medals_is_private: false,
+    enrollments_is_private: false,
+    featured_course_ids: [],
   })
   expect(
     screen.queryByLabelText('Eliminar mi avatar actual al guardar'),
@@ -608,6 +773,8 @@ it('preserves medal privacy under the global switch and saves the section prefer
     is_private: false,
     bio_is_private: false,
     medals_is_private: true,
+    enrollments_is_private: false,
+    featured_course_ids: [],
   })
   expect(screen.getByRole('button', { name: 'Guardar cambios' }).disabled).toBe(
     true,

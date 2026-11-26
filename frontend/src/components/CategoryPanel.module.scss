@@ -1,0 +1,33 @@
+@use '../styles/mixins';
+
+.panel {
+  display: grid;
+  gap: var(--space-6);
+  margin-block: var(--space-8);
+}
+
+.forms {
+  display: grid;
+  gap: var(--space-6);
+
+  @include mixins.desktop {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.fields {
+  display: grid;
+  align-content: start;
+  gap: var(--space-4);
+  min-inline-size: 0;
+  margin: 0;
+  padding: var(--space-6);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-panel);
+  background: var(--color-surface);
+
+  legend {
+    padding-inline: var(--space-2);
+    font-weight: 600;
+  }
+}

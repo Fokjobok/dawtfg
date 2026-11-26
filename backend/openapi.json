@@ -562,7 +562,7 @@
             "sessionCookie": []
           }
         ],
-        "description": "Administrator consulta todo el catálogo. Coach consulta solo sus especialidades asignadas; los parámetros del cliente no amplían ese alcance. Student no tiene acceso. Lista paginada ordenada por nombre e id, con id y nombre de cada especialidad. No incluye datos de usuarios.",
+        "description": "Administrator consulta todo el catálogo. Coach consulta solo sus especialidades asignadas; los parámetros del cliente no amplían ese alcance. Student no tiene acceso. Lista paginada ordenada por nombre e id, con id y nombre de cada especialidad. No incluye datos de usuarios. Cada opción incluye category nullable. Los DTO de especialidad de cursos, medallas y usuarios mantienen id/name.",
         "parameters": [
           {
             "name": "page",
@@ -671,7 +671,7 @@
             "sessionCookie": []
           }
         ],
-        "description": "Cookies y CSRF obligatorios. Guarda únicamente la especialidad en el catálogo, sin asociarla a ningún usuario. Para asignarla, editar un usuario con rol Coach mediante PATCH users/{user}. Los estudiantes no pueden recibir especialidades. Crear una especialidad y cancelar después la edición del usuario no elimina la especialidad creada.",
+        "description": "Cookies y CSRF obligatorios. Guarda únicamente la especialidad en el catálogo, sin asociarla a ningún usuario. Para asignarla, editar un usuario con rol Coach mediante PATCH users/{user}. Los estudiantes no pueden recibir especialidades. Crear una especialidad y cancelar después la edición del usuario no elimina la especialidad creada. category_id opcional clasifica la nueva especialidad, sin asignar docentes. Puede clasificarse después mediante PATCH specialties/{specialty}.",
         "parameters": [
           {
             "name": "X-XSRF-TOKEN",
@@ -828,7 +828,7 @@
         ],
         "operationId": "listPublicCourses",
         "summary": "Consulta el catálogo público de cursos publicados",
-        "description": "Sin sesión obligatoria. Solo cursos published con especialidad existente y responsable de rol Coach asignado a ella; los cursos heredados incompletos no se muestran. Mismo alcance para cualquier rol. Parámetros ajenos a esta operación no permiten consultar borradores. Orden id descendente, respuesta paginada, sin correos, rutas internas o listas privadas de usuarios. No implica inscripción ni pagos. Admite filtros combinables filter[specialty_id] y filter[level], aplicados antes de paginar. Mantiene publicados y asignaciones válidas; los filtros no amplían permisos. El orden actual es id descendente (creación más reciente), no una fecha de publicación independiente.",
+        "description": "Sin sesión obligatoria. Solo cursos published con especialidad existente y responsable de rol Coach asignado a ella; los cursos heredados incompletos no se muestran. Mismo alcance para cualquier rol. Parámetros ajenos a esta operación no permiten consultar borradores. Orden id descendente, respuesta paginada, sin correos, rutas internas o listas privadas de usuarios. No implica inscripción ni pagos. Admite filtros combinables filter[specialty_id] y filter[level], aplicados antes de paginar. Mantiene publicados y asignaciones válidas; los filtros no amplían permisos. El orden actual es id descendente (creación más reciente), no una fecha de publicación independiente. filter[category_id] se aplica a la categoría de la especialidad, combinado mediante AND con los otros filtros. Sin filtros se conservan todos los cursos visibles, incluidos los no clasificados.",
         "security": [],
         "parameters": [
           {
@@ -868,6 +868,15 @@
               "$ref": "#/components/schemas/CourseLevel"
             },
             "description": "Nivel exacto. Se combina con la especialidad antes de paginar. Sin este filtro también se incluyen cursos sin clasificar."
+          },
+          {
+            "name": "filter[category_id]",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "description": "Categoría superior de la especialidad; se combina con specialty_id/level antes de paginar cuando corresponda. ID inexistente produce lista vacía."
           }
         ],
         "responses": {
@@ -934,6 +943,15 @@
               "$ref": "#/components/schemas/CourseLevel"
             },
             "description": "Nivel exacto. Se combina con la especialidad antes de paginar. Sin este filtro también se incluyen cursos sin clasificar."
+          },
+          {
+            "name": "filter[category_id]",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "description": "Categoría superior de la especialidad; se combina con specialty_id/level antes de paginar cuando corresponda. ID inexistente produce lista vacía."
           }
         ],
         "responses": {
@@ -1271,7 +1289,7 @@
         "operationId": "listCatalogSpecialties",
         "summary": "Especialidades del catálogo público",
         "security": [],
-        "description": "Consulta pública y paginada de id/nombre de especialidades con cursos publicados y asignaciones válidas. Orden por nombre/id. No expone grupos privados o vacíos ni permite gestionar especialidades. La consulta administrativa GET /specialties conserva sus permisos.",
+        "description": "Consulta pública y paginada de id/nombre de especialidades con cursos publicados y asignaciones válidas. Orden por nombre/id. No expone grupos privados o vacíos ni permite gestionar especialidades. La consulta administrativa GET /specialties conserva sus permisos. Incluye category nullable; filter[category_id] filtra opciones antes de paginar. Sin filtro conserva especialidades sin clasificar.",
         "parameters": [
           {
             "name": "page",
@@ -1291,6 +1309,15 @@
               "maximum": 100,
               "default": 20
             }
+          },
+          {
+            "name": "filter[category_id]",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "description": "Categoría superior de la especialidad; se combina con specialty_id/level antes de paginar cuando corresponda. ID inexistente produce lista vacía."
           }
         ],
         "responses": {
@@ -1338,6 +1365,15 @@
               "maximum": 100,
               "default": 20
             }
+          },
+          {
+            "name": "filter[category_id]",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "description": "Categoría superior de la especialidad; se combina con specialty_id/level antes de paginar cuando corresponda. ID inexistente produce lista vacía."
           }
         ],
         "responses": {
@@ -1351,7 +1387,7 @@
             "description": "Error interno; sin cuerpo."
           }
         },
-        "description": "Consulta pública y paginada de id/nombre de especialidades con cursos publicados y asignaciones válidas. Orden por nombre/id. No expone grupos privados o vacíos ni permite gestionar especialidades. La consulta administrativa GET /specialties conserva sus permisos."
+        "description": "Consulta pública y paginada de id/nombre de especialidades con cursos publicados y asignaciones válidas. Orden por nombre/id. No expone grupos privados o vacíos ni permite gestionar especialidades. La consulta administrativa GET /specialties conserva sus permisos. Incluye category nullable; filter[category_id] filtra opciones antes de paginar. Sin filtro conserva especialidades sin clasificar."
       }
     },
     "/api/v1/courses/{course}": {
@@ -3153,6 +3189,354 @@
           }
         }
       }
+    },
+    "/api/v1/categories": {
+      "get": {
+        "tags": [
+          "Administración"
+        ],
+        "operationId": "listCategories",
+        "summary": "Lista todas las categorías como Administrator",
+        "description": "Catálogo completo privado, paginado y ordenado por nombre/ID, incluidas categorías sin cursos.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Categorías administrativas; no-store/private.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CategoryCollection"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      },
+      "head": {
+        "tags": [
+          "Administración"
+        ],
+        "operationId": "headCategories",
+        "summary": "Lista todas las categorías como Administrator",
+        "description": "Catálogo completo privado, paginado y ordenado por nombre/ID, incluidas categorías sin cursos.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Categorías administrativas; no-store/private. Sin cuerpo."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated",
+            "description": " Sin cuerpo."
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden",
+            "description": " Sin cuerpo."
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError",
+            "description": " Sin cuerpo."
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError",
+            "description": " Sin cuerpo."
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Administración"
+        ],
+        "operationId": "createCategory",
+        "summary": "Crea una categoría como Administrator",
+        "description": "Sesión web/CSRF obligatorios, también sin Origin. Nombre único de 1–100 caracteres recortados. Rol actual revalidado bajo bloqueo. Crear no clasifica especialidades ni modifica cursos.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-XSRF-TOKEN",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Token URL-decodificado de la cookie; Swagger lo prepara automáticamente."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StoreCategoryInput"
+              },
+              "example": {
+                "name": "Videojuegos"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Categoría creada; no se ofrece consulta individual.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CategoryEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "419": {
+            "$ref": "#/components/responses/SessionExpired"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/v1/catalog/categories": {
+      "get": {
+        "tags": [
+          "Cursos"
+        ],
+        "operationId": "listCatalogCategories",
+        "summary": "Lista categorías con cursos visibles",
+        "description": "Público: únicamente categorías con especialidades que tengan cursos del catálogo público válido. Sin borradores o categorías vacías, ni recuentos privados. Orden por nombre/ID y paginación. No clasifica automáticamente especialidades anteriores.",
+        "security": [],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Opciones públicas; no-store.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CategoryCollection"
+                }
+              }
+            }
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      },
+      "head": {
+        "tags": [
+          "Cursos"
+        ],
+        "operationId": "headCatalogCategories",
+        "summary": "Lista categorías con cursos visibles",
+        "description": "Público: únicamente categorías con especialidades que tengan cursos del catálogo público válido. Sin borradores o categorías vacías, ni recuentos privados. Orden por nombre/ID y paginación. No clasifica automáticamente especialidades anteriores.",
+        "security": [],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Opciones públicas; no-store. Sin cuerpo."
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError",
+            "description": " Sin cuerpo."
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError",
+            "description": " Sin cuerpo."
+          }
+        }
+      }
+    },
+    "/api/v1/specialties/{specialty}": {
+      "patch": {
+        "tags": [
+          "Administración"
+        ],
+        "operationId": "classifySpecialty",
+        "summary": "Asigna la categoría de un juego o materia como Administrator",
+        "description": "Sesión/CSRF. category_id obligatorio, nullable. Solo clasifica: no cambia nombre/ID/asignaciones de Coaches ni cursos. Repetir conserva updated_at. Bloqueo usuario -> especialidad, revalidación del rol actual y FK a categoría existente. No consume cooldown del perfil.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "specialty",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "X-XSRF-TOKEN",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Token URL-decodificado de la cookie; Swagger lo prepara automáticamente."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSpecialtyCategoryInput"
+              },
+              "example": {
+                "category_id": 1
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Especialidad con su categoría actual; no-store/private.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpecialtyEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/SpecialtyNotFound"
+          },
+          "419": {
+            "$ref": "#/components/responses/SessionExpired"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -3468,7 +3852,7 @@
           "data": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/Specialty"
+              "$ref": "#/components/schemas/CategorizedSpecialty"
             }
           },
           "links": {
@@ -3532,7 +3916,7 @@
         ],
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/Specialty"
+            "$ref": "#/components/schemas/CategorizedSpecialty"
           }
         }
       },
@@ -3547,6 +3931,14 @@
             "minLength": 1,
             "maxLength": 100,
             "description": "Se eliminan espacios extremos. Nombre único según la restricción actual de la base (sensible a mayúsculas)."
+          },
+          "category_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "description": "Categoría superior opcional. Omitida/null conserva la creación sin clasificar."
           }
         }
       },
@@ -5219,6 +5611,164 @@
             "type": "string",
             "format": "binary",
             "description": "Opcional: JPG, PNG o WebP; máximo 1024 KiB y máximos independientes de 512 píxeles de ancho y alto. Sin SVG/GIF."
+          }
+        }
+      },
+      "Category": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 100
+          }
+        }
+      },
+      "CategoryEnvelope": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/Category"
+          }
+        }
+      },
+      "CategoryCollection": {
+        "type": "object",
+        "required": [
+          "data",
+          "links",
+          "meta"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Category"
+            }
+          },
+          "links": {
+            "type": "object",
+            "properties": {
+              "first": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "last": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "prev": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "next": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          },
+          "meta": {
+            "type": "object",
+            "required": [
+              "current_page",
+              "last_page",
+              "per_page",
+              "total"
+            ],
+            "properties": {
+              "current_page": {
+                "type": "integer"
+              },
+              "last_page": {
+                "type": "integer"
+              },
+              "per_page": {
+                "type": "integer"
+              },
+              "total": {
+                "type": "integer"
+              }
+            }
+          }
+        }
+      },
+      "CategorizedSpecialty": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name",
+          "category"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "name": {
+            "type": "string"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Category"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Categoría superior. null hasta que Administrator clasifique la especialidad."
+          }
+        }
+      },
+      "StoreCategoryInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "Recortado y único en el catálogo."
+          }
+        }
+      },
+      "UpdateSpecialtyCategoryInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "category_id"
+        ],
+        "properties": {
+          "category_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "description": "Categoría existente o null para dejar sin clasificar. No modifica nombre, docentes o cursos."
           }
         }
       }

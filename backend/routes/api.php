@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\V1\CatalogSpecialtyController;
+use App\Http\Controllers\Api\V1\CategoryController;
 use App\Http\Controllers\Api\V1\CourseController;
 use App\Http\Controllers\Api\V1\CurrentUserController;
 use App\Http\Controllers\Api\V1\HealthController;
@@ -16,6 +17,7 @@ Route::prefix('v1')->group(function (): void {
     Route::get('profiles/{user}/avatar', [ProfileController::class, 'avatar'])->whereNumber('user')->name('api.v1.profiles.avatar');
     Route::get('courses', [CourseController::class, 'index'])->name('api.v1.courses.index');
     Route::get('catalog/specialties', CatalogSpecialtyController::class)->name('api.v1.catalog.specialties');
+    Route::get('catalog/categories', [CategoryController::class, 'catalog'])->name('api.v1.catalog.categories');
     Route::get('teaching/courses', [CourseController::class, 'managed'])->middleware('auth:sanctum')->name('api.v1.courses.managed');
     Route::get('courses/{course}', [CourseController::class, 'show'])->whereNumber('course')->middleware('auth:sanctum')->name('api.v1.courses.show');
     Route::get('courses/{course}/cover', [CourseController::class, 'cover'])->whereNumber('course')->name('api.v1.courses.cover');

@@ -7,9 +7,11 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\ListSpecialtiesRequest;
 use App\Http\Requests\ListSpecialtyCoachesRequest;
 use App\Http\Requests\StoreSpecialtyRequest;
+use App\Http\Requests\UpdateSpecialtyCategoryRequest;
+use App\Http\Resources\CategorizedSpecialtyResource;
 use App\Http\Resources\CoachResource;
-use App\Http\Resources\SpecialtyResource;
 use App\Models\Specialty;
+use App\Services\CategoryAdministrationService;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Validation\ValidationException;
@@ -23,7 +25,7 @@ class SpecialtyController extends Controller
             ? $request->user()->specialties()
             : Specialty::query();
 
-        return SpecialtyResource::collection($specialties->orderBy('name')->orderBy('specialties.id')
+        return CategorizedSpecialtyResource::collection($specialties->with('category')->orderBy('name')->orderBy('specialties.id')
             ->paginate($input['per_page'] ?? 20)->withQueryString())
             ->response()->header('Cache-Control', 'no-store, private');
     }
@@ -38,7 +40,7 @@ class SpecialtyController extends Controller
         }
 
         // Creating the catalog entry does not assign it to any user.
-        return (new SpecialtyResource($specialty))->response()
+        return (new CategorizedSpecialtyResource($specialty->load('category')))->response()
             ->setStatusCode(201)->header('Cache-Control', 'no-store, private');
     }
 
@@ -49,6 +51,14 @@ class SpecialtyController extends Controller
 
         return CoachResource::collection($coaches->orderBy('users.name')->orderBy('users.id')
             ->paginate($input['per_page'] ?? 20)->withQueryString())
+            ->response()->header('Cache-Control', 'no-store, private');
+    }
+
+    public function updateCategory(UpdateSpecialtyCategoryRequest $request, Specialty $specialty, CategoryAdministrationService $service): JsonResponse
+    {
+        $input = $request->validated();
+
+        return (new CategorizedSpecialtyResource($service->classify($request->user('web'), $specialty, $input['category_id'])))
             ->response()->header('Cache-Control', 'no-store, private');
     }
 }

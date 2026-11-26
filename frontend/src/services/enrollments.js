@@ -29,3 +29,12 @@ export async function withdrawEnrollment(enrollmentId) {
     method: 'DELETE',
   })
 }
+
+export function getEnrollmentPage(page = 1) {
+  const params = new URLSearchParams({
+    page: String(page),
+    per_page: '6',
+  })
+
+  return apiRequest(`/enrollments?${params}`)
+}

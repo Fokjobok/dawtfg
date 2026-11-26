@@ -16,10 +16,15 @@ export async function updateOwnProfile(details) {
     body.append('_method', 'PATCH')
 
     for (const [field, value] of Object.entries(fields)) {
-      body.append(
-        field,
-        typeof value === 'boolean' ? (value ? '1' : '0') : String(value ?? ''),
-      )
+      const serialized = Array.isArray(value)
+        ? JSON.stringify(value)
+        : typeof value === 'boolean'
+          ? value
+            ? '1'
+            : '0'
+          : String(value ?? '')
+
+      body.append(field, serialized)
     }
 
     body.append('avatar', avatar)

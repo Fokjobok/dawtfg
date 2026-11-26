@@ -131,7 +131,7 @@ final class CourseLevelTest extends TestCase
         (new Course)->forceFill([...$invalid, 'status' => 'published', 'coach_id' => null])->save();
         Specialty::create(['name' => 'Empty']);
         $response = $this->getJson('/api/v1/catalog/specialties')->assertOk()->assertJsonPath('meta.total', 1)
-            ->assertJsonPath('data', [['id' => $first['specialty_id'], 'name' => Specialty::findOrFail($first['specialty_id'])->name]]);
+            ->assertJsonPath('data', [['id' => $first['specialty_id'], 'name' => Specialty::findOrFail($first['specialty_id'])->name, 'category' => null]]);
         $this->assertStringContainsString('no-store', $response->headers->get('Cache-Control'));
         $this->getJson('/api/v1/catalog/specialties?page=0&per_page=101')->assertUnprocessable()->assertJsonValidationErrors(['page', 'per_page']);
         $this->head('/api/v1/catalog/specialties')->assertOk()->assertContent('');

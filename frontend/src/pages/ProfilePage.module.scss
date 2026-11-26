@@ -109,7 +109,6 @@
 }
 
 .bio {
-  max-width: 65ch;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
@@ -171,4 +170,15 @@
   @include mixins.desktop {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+.withCourses {
+  @include mixins.desktop {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+}
+
+.fullWidth {
+  grid-column: 1 / -1;
 }

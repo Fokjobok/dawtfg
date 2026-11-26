@@ -20,6 +20,7 @@ class ListPublicCoursesRequest extends FormRequest
             'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],
             'filter' => ['sometimes', 'array'],
             'filter.specialty_id' => ['sometimes', 'required', 'integer', 'min:1'],
+            'filter.category_id' => ['sometimes', 'required', 'integer', 'min:1'],
             'filter.level' => ['sometimes', 'required', Rule::enum(CourseLevel::class)],
         ];
     }

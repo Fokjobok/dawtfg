@@ -7,6 +7,9 @@ import { useAuth } from '../context/AuthContext.jsx'
 import styles from './ProfilePage.module.scss'
 import EditProfileForm from '../components/EditProfileForm.jsx'
 
+import ProfileMedals from '../components/ProfileMedals.jsx'
+import ProfileCourses from '../components/ProfileCourses.jsx'
+
 export default function ProfilePage() {
   const { userId } = useParams()
 
@@ -106,10 +109,17 @@ function ProfileDetails({ userId }) {
           )}
         </header>
 
-        {(Object.hasOwn(profile, 'bio') || profile.can_edit) && (
+        {(Object.hasOwn(profile, 'bio') ||
+          profile.can_edit ||
+          profile.featured_courses?.length > 0) && (
           <div
             className={`${styles.content} ${
-              profile.can_edit ? styles.withSettings : ''
+              profile.featured_courses?.length > 0 &&
+              Object.hasOwn(profile, 'bio')
+                ? styles.withCourses
+                : profile.can_edit
+                  ? styles.withSettings
+                  : ''
             }`}
           >
             {Object.hasOwn(profile, 'bio') && (
@@ -125,9 +135,15 @@ function ProfileDetails({ userId }) {
               </section>
             )}
 
+            {Object.hasOwn(profile, 'featured_courses') && (
+              <ProfileCourses courses={profile.featured_courses} />
+            )}
+
             {profile.can_edit && (
               <section
-                className={styles.visibility}
+                className={`${styles.visibility} ${
+                  profile.featured_courses?.length ? styles.fullWidth : ''
+                }`}
                 aria-labelledby="profile-privacy-title"
               >
                 <h2 id="profile-privacy-title">Tu privacidad</h2>
@@ -146,6 +162,22 @@ function ProfileDetails({ userId }) {
                         : 'Visible para todos'}
                     </dd>
                   </div>
+                  <div>
+                    <dt>Medallas</dt>
+                    <dd>
+                      {profile.is_private || profile.medals_is_private
+                        ? 'Solo tú'
+                        : 'Visible para todos'}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Cursos destacados</dt>
+                    <dd>
+                      {profile.is_private || profile.enrollments_is_private
+                        ? 'Solo tú'
+                        : 'Visible para todos'}
+                    </dd>
+                  </div>
                 </dl>
 
                 <p className={styles.visibilityNote}>
@@ -158,6 +190,10 @@ function ProfileDetails({ userId }) {
               </section>
             )}
           </div>
+        )}
+
+        {Object.hasOwn(profile, 'medals') && (
+          <ProfileMedals medals={profile.medals} isOwner={profile.can_edit} />
         )}
       </div>
 
